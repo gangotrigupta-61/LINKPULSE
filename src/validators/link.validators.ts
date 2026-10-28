@@ -1,24 +1,26 @@
 import { z } from "zod";
 import { isReservedWord } from "@/lib/reserved-words";
 
-export const createLinkSchema = z.object({
-  url: z
-    .string()
-    .trim()
-    .min(1, "Destination URL is required")
-    .refine(
-      (val) => {
-        try {
-          const parsed = new URL(val);
-          return parsed.protocol === "http:" || parsed.protocol === "https:";
-        } catch {
-          return false;
-        }
-      },
-      {
-        message: "URL must be a valid address starting with http:// or https://",
+export const urlSchema = z
+  .string()
+  .trim()
+  .min(1, "Destination URL is required")
+  .refine(
+    (val) => {
+      try {
+        const parsed = new URL(val);
+        return parsed.protocol === "http:" || parsed.protocol === "https:";
+      } catch {
+        return false;
       }
-    ),
+    },
+    {
+      message: "URL must be a valid address starting with http:// or https://",
+    }
+  );
+
+export const createLinkSchema = z.object({
+  url: urlSchema,
   alias: z
     .string()
     .trim()
@@ -60,3 +62,30 @@ export const createLinkSchema = z.object({
 });
 
 export type CreateLinkInput = z.infer<typeof createLinkSchema>;
+
+export const updateLinkSchema = z.object({
+  url: urlSchema.optional(),
+  originalUrl: urlSchema.optional(),
+  title: z
+    .string()
+    .trim()
+    .max(100, "Title cannot exceed 100 characters")
+    .nullable()
+    .optional(),
+  isActive: z.boolean().optional(),
+  expiresAt: z
+    .string()
+    .trim()
+    .nullable()
+    .optional()
+    .refine(
+      (val) => {
+        if (val == null || val === "") return true;
+        const d = new Date(val);
+        return !isNaN(d.getTime());
+      },
+      { message: "Expiry date must be a valid date string or null" }
+    ),
+});
+
+export type UpdateLinkInput = z.infer<typeof updateLinkSchema>;

@@ -20,6 +20,11 @@ interface ClickHistory {
   count: number;
 }
 
+interface ReferrerData {
+  referrer: string;
+  count: number;
+}
+
 interface AnalyticsData {
   totalClicks: number;
   lastClickAt: string | null;
@@ -30,9 +35,10 @@ interface AnalyticsData {
   isActive: boolean;
   createdAt: string;
   expiresAt: string | null;
+  topReferrers?: ReferrerData[];
   devices?: { device: string; count: number }[];
   browsers?: { browser: string; count: number }[];
-  referrers?: { referrer: string; count: number }[];
+  referrers?: ReferrerData[];
 }
 
 // ─── Tiny inline bar chart (no external deps) ────────────────────────────────
@@ -58,6 +64,212 @@ function MiniBarChart({ data }: { data: ClickHistory[] }) {
           }}
         />
       ))}
+    </div>
+  );
+}
+
+// ─── Edit Link modal ──────────────────────────────────────────────────────────
+function EditLinkModal({
+  link,
+  onClose,
+  onSaved,
+}: {
+  link: LinkItem;
+  onClose: () => void;
+  onSaved: (updated: LinkItem) => void;
+}) {
+  const [originalUrl, setOriginalUrl] = useState(link.originalUrl);
+  const [title, setTitle] = useState(link.title || "");
+  const [expiresAt, setExpiresAt] = useState(
+    link.expiresAt ? new Date(link.expiresAt).toISOString().slice(0, 16) : ""
+  );
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setError(null);
+
+    const trimmedUrl = originalUrl.trim();
+    if (!trimmedUrl) {
+      setError("Destination URL is required.");
+      return;
+    }
+
+    if (!/^https?:\/\//i.test(trimmedUrl)) {
+      setError("URL must be a valid address starting with http:// or https://");
+      return;
+    }
+
+    setSaving(true);
+    try {
+      const res = await fetch(`/api/links/${link.id}`, {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          originalUrl: trimmedUrl,
+          title: title.trim() || null,
+          expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+        }),
+      });
+
+      const data = await res.json();
+      if (!res.ok) {
+        setError(data.error || "Failed to update link.");
+        setSaving(false);
+        return;
+      }
+
+      onSaved(data as LinkItem);
+      onClose();
+    } catch {
+      setError("Network error. Please try again.");
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div
+      style={{
+        position: "fixed",
+        inset: 0,
+        background: "rgba(0,0,0,0.65)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        zIndex: 1000,
+        padding: "var(--space-4)",
+      }}
+      onClick={(e) => {
+        if (e.target === e.currentTarget) onClose();
+      }}
+    >
+      <div
+        style={{
+          background: "var(--color-surface)",
+          border: "1px solid var(--color-border)",
+          borderRadius: "var(--radius-lg)",
+          padding: "var(--space-6)",
+          width: "100%",
+          maxWidth: "500px",
+          display: "flex",
+          flexDirection: "column",
+          gap: "var(--space-4)",
+          boxShadow: "var(--shadow-lg)",
+        }}
+      >
+        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+          <h3 style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-bold)" }}>
+            ✏️ Edit Link
+          </h3>
+          <button
+            onClick={onClose}
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "var(--color-text-muted)",
+              cursor: "pointer",
+              fontSize: "var(--text-lg)",
+              padding: "var(--space-1)",
+            }}
+            aria-label="Close edit modal"
+          >
+            ✕
+          </button>
+        </div>
+
+        {error && (
+          <div className="auth-alert-error" role="alert">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit} className="auth-form" noValidate>
+          <div className="form-group">
+            <label className="form-label">Short Code (unchangeable)</label>
+            <input
+              type="text"
+              readOnly
+              value={link.shortCode}
+              className="form-input"
+              style={{
+                background: "var(--color-surface-2)",
+                color: "var(--color-text-muted)",
+                fontFamily: "var(--font-mono)",
+              }}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-dest-url" className="form-label">
+              Destination URL *
+            </label>
+            <input
+              id="edit-dest-url"
+              type="url"
+              required
+              className="form-input"
+              placeholder="https://example.com/new-destination"
+              value={originalUrl}
+              onChange={(e) => setOriginalUrl(e.target.value)}
+              disabled={saving}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-title" className="form-label">
+              Title (optional)
+            </label>
+            <input
+              id="edit-title"
+              type="text"
+              className="form-input"
+              placeholder="Link title"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={saving}
+            />
+          </div>
+
+          <div className="form-group">
+            <label htmlFor="edit-expiry" className="form-label">
+              Expiration Date (optional, clear to remove)
+            </label>
+            <input
+              id="edit-expiry"
+              type="datetime-local"
+              className="form-input"
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              disabled={saving}
+            />
+          </div>
+
+          <div style={{ display: "flex", gap: "var(--space-2)", marginTop: "var(--space-2)" }}>
+            <button
+              type="button"
+              onClick={onClose}
+              disabled={saving}
+              className="form-button"
+              style={{
+                background: "transparent",
+                border: "1px solid var(--color-border)",
+                color: "var(--color-text)",
+              }}
+            >
+              Cancel
+            </button>
+            <button
+              id="save-edit-link-btn"
+              type="submit"
+              disabled={saving}
+              className="form-button"
+            >
+              {saving ? "Saving Changes…" : "Save Changes"}
+            </button>
+          </div>
+        </form>
+      </div>
     </div>
   );
 }
@@ -301,6 +513,45 @@ function AnalyticsModal({
               <MiniBarChart data={data.clickHistory} />
             </div>
 
+            {/* Top Referrers */}
+            {data.topReferrers && data.topReferrers.length > 0 && (
+              <div
+                style={{
+                  background: "var(--color-surface-2)",
+                  border: "1px solid var(--color-border)",
+                  borderRadius: "var(--radius-md)",
+                  padding: "var(--space-4)",
+                  display: "flex",
+                  flexDirection: "column",
+                  gap: "var(--space-2)",
+                }}
+              >
+                <div style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-semibold)" }}>
+                  Top Referrers
+                </div>
+                <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-1)" }}>
+                  {data.topReferrers.slice(0, 5).map((r) => (
+                    <div
+                      key={r.referrer}
+                      style={{
+                        display: "flex",
+                        justifyContent: "space-between",
+                        fontSize: "var(--text-xs)",
+                        padding: "var(--space-1) var(--space-2)",
+                        background: "var(--color-surface)",
+                        borderRadius: "var(--radius-sm)",
+                      }}
+                    >
+                      <span style={{ fontFamily: "var(--font-mono)" }}>{r.referrer}</span>
+                      <span style={{ color: "var(--color-accent)", fontWeight: "var(--font-semibold)" }}>
+                        {r.count} {r.count === 1 ? "click" : "clicks"}
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
             {/* Devices & Browsers */}
             {data.devices && data.devices.length > 0 && (
               <div
@@ -364,11 +615,13 @@ function LinkCard({
   onToggleActive,
   onDelete,
   onAnalytics,
+  onEdit,
 }: {
   link: LinkItem;
   onToggleActive: (id: string, current: boolean) => void;
   onDelete: (id: string) => void;
   onAnalytics: (id: string) => void;
+  onEdit: (link: LinkItem) => void;
 }) {
   const [copied, setCopied] = useState(false);
   const [toggling, setToggling] = useState(false);
@@ -541,6 +794,22 @@ function LinkCard({
         </button>
 
         <button
+          onClick={() => onEdit(link)}
+          className="form-button"
+          style={{
+            width: "auto",
+            padding: "var(--space-2) var(--space-3)",
+            fontSize: "var(--text-xs)",
+            background: "var(--color-surface)",
+            border: "1px solid var(--color-border)",
+            color: "var(--color-text)",
+          }}
+          title="Edit destination URL and details"
+        >
+          ✏️ Edit
+        </button>
+
+        <button
           onClick={() => onAnalytics(link.id)}
           className="form-button"
           style={{
@@ -604,6 +873,7 @@ export function MyLinksSection() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [analyticsLinkId, setAnalyticsLinkId] = useState<string | null>(null);
+  const [editingLink, setEditingLink] = useState<LinkItem | null>(null);
 
   const fetchLinks = useCallback(async () => {
     setLoading(true);
@@ -674,6 +944,10 @@ export function MyLinksSection() {
     } catch {
       // silent
     }
+  }
+
+  function handleLinkSaved(updated: LinkItem) {
+    setLinks((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
   }
 
   return (
@@ -766,6 +1040,7 @@ export function MyLinksSection() {
               onToggleActive={handleToggleActive}
               onDelete={handleDelete}
               onAnalytics={(id) => setAnalyticsLinkId(id)}
+              onEdit={(l) => setEditingLink(l)}
             />
           ))}
         </div>
@@ -777,7 +1052,14 @@ export function MyLinksSection() {
           onClose={() => setAnalyticsLinkId(null)}
         />
       )}
+
+      {editingLink && (
+        <EditLinkModal
+          link={editingLink}
+          onClose={() => setEditingLink(null)}
+          onSaved={handleLinkSaved}
+        />
+      )}
     </div>
   );
 }
-

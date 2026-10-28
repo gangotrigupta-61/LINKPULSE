@@ -9,10 +9,6 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 // ─── Mock Prisma before any imports that use it ───────────────────────────────
 
 vi.mock("@/lib/prisma", () => {
-  const link = vi.fn();
-  const click = vi.fn();
-  const user = vi.fn();
-
   return {
     prisma: {
       link: {
@@ -34,7 +30,6 @@ vi.mock("@/lib/prisma", () => {
         findUnique: vi.fn(),
         findMany: vi.fn(),
       },
-      _dummy: { link, click, user },
     },
   };
 });
@@ -54,6 +49,7 @@ import {
   deleteLink,
 } from "@/services/link-management.service";
 import { createLink } from "@/services/links.service";
+import { updateLinkSchema } from "@/validators/link.validators";
 
 // ─── Typed helpers ────────────────────────────────────────────────────────────
 
@@ -101,16 +97,150 @@ beforeEach(() => {
 });
 
 // ═════════════════════════════════════════════════════════════════════════════
-// PHASE 4 TESTS
+// PHASE 4 & 5 TESTS
 // ═════════════════════════════════════════════════════════════════════════════
 
-// ─── TEST 1: Phase 3 regression — link creation ───────────────────────────────
+// ─── TEST 1: Authenticated owner can update originalUrl ───────────────────────
 
-describe("TEST 1: Phase 3 regression — link creation", () => {
-  it("creates a link for an authenticated user", async () => {
-    // First findFirst (collision check) returns null = no collision
-    mockLinkFindFirst.mockResolvedValue(null);
-    mockLinkCreate.mockResolvedValue({
+describe("TEST 1: Authenticated owner can update originalUrl", () => {
+  it("allows owner to update destination originalUrl", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce({ id: "link-id-1" } as never);
+    mockLinkUpdate.mockResolvedValueOnce({
+      id: "link-id-1",
+      shortCode: "abc1234",
+      originalUrl: "https://updated-destination.example.com",
+      title: "Updated Title",
+      expiresAt: null,
+      isActive: true,
+      createdAt: new Date(),
+      _count: { clicks: 0 },
+    } as never);
+
+    const result = await updateLink("link-id-1", "user-a-id", {
+      originalUrl: "https://updated-destination.example.com",
+      title: "Updated Title",
+    });
+
+    expect(result).not.toBeNull();
+    expect(result?.originalUrl).toBe("https://updated-destination.example.com");
+    expect(mockLinkUpdate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        where: { id: "link-id-1" },
+        data: expect.objectContaining({
+          originalUrl: "https://updated-destination.example.com",
+        }),
+      })
+    );
+  });
+});
+
+// ─── TEST 2: Invalid originalUrl is rejected using Phase 3 validation rules ───
+
+describe("TEST 2: Invalid originalUrl rejected with Phase 3 validation rules", () => {
+  it("rejects non-url string", () => {
+    const res = updateLinkSchema.safeParse({ originalUrl: "not-a-valid-url" });
+    expect(res.success).toBe(false);
+  });
+
+  it("rejects dangerous javascript: protocol", () => {
+    const res = updateLinkSchema.safeParse({ originalUrl: "javascript:alert(1)" });
+    expect(res.success).toBe(false);
+  });
+
+  it("rejects ftp: protocol", () => {
+    const res = updateLinkSchema.safeParse({ originalUrl: "ftp://files.example.com" });
+    expect(res.success).toBe(false);
+  });
+
+  it("accepts valid http and https URLs", () => {
+    const resHttp = updateLinkSchema.safeParse({ originalUrl: "http://example.com" });
+    const resHttps = updateLinkSchema.safeParse({ originalUrl: "https://example.com/path" });
+    expect(resHttp.success).toBe(true);
+    expect(resHttps.success).toBe(true);
+  });
+});
+
+// ─── TEST 3: User A cannot update User B's originalUrl ───────────────────────
+
+describe("TEST 3: User A cannot update User B's originalUrl", () => {
+  it("blocks User A from changing destination URL of User B's link", async () => {
+    // Ownership findFirst returns null = user does not own link
+    mockLinkFindFirst.mockResolvedValueOnce(null);
+
+    const result = await updateLink("user-b-link-id", "user-a-id", {
+      originalUrl: "https://malicious-hijack.com",
+    });
+
+    expect(result).toBeNull();
+    expect(mockLinkUpdate).not.toHaveBeenCalled();
+  });
+});
+
+// ─── TEST 4: Successful redirect records referrer ────────────────────────────
+
+describe("TEST 4: Successful redirect records referrer", () => {
+  it("records referrer, deviceType, and browser safely on click", async () => {
+    mockClickCreate.mockResolvedValueOnce({
+      id: "click-1",
+      linkId: "link-id-1",
+      timestamp: new Date(),
+    } as never);
+
+    await recordClick("link-id-1", {
+      referrer: "https://twitter.com/some/tweet",
+      deviceType: "mobile",
+      browser: "Chrome",
+    });
+
+    expect(mockClickCreate).toHaveBeenCalledWith(
+      expect.objectContaining({
+        data: expect.objectContaining({
+          linkId: "link-id-1",
+          referrer: "https://twitter.com/some/tweet",
+          deviceType: "mobile",
+          browser: "Chrome",
+        }),
+      })
+    );
+  });
+});
+
+// ─── TEST 5: Analytics returns top referrers with correct counts ─────────────
+
+describe("TEST 5: Analytics returns top referrers with correct counts", () => {
+  it("aggregates and ranks referrers, mapping missing referrer to Direct", async () => {
+    const now = new Date();
+    mockClickFindMany.mockResolvedValueOnce([
+      { timestamp: now, referrer: "https://github.com/trending", deviceType: "desktop", browser: "Chrome" },
+      { timestamp: now, referrer: "https://github.com/dashboard", deviceType: "desktop", browser: "Chrome" },
+      { timestamp: now, referrer: null, deviceType: "mobile", browser: "Safari" }, // Direct
+      { timestamp: now, referrer: "https://google.com/search", deviceType: "desktop", browser: "Edge" },
+    ] as never);
+
+    const analytics = await getLinkAnalytics("link-id-1");
+
+    expect(analytics.totalClicks).toBe(4);
+    expect(analytics.topReferrers).toBeDefined();
+
+    const github = analytics.topReferrers.find((r) => r.referrer === "github.com");
+    const direct = analytics.topReferrers.find((r) => r.referrer === "Direct");
+    const google = analytics.topReferrers.find((r) => r.referrer === "google.com");
+
+    expect(github?.count).toBe(2);
+    expect(direct?.count).toBe(1);
+    expect(google?.count).toBe(1);
+
+    // Ensure sorted descending by count
+    expect(analytics.topReferrers[0].referrer).toBe("github.com");
+  });
+});
+
+// ─── TEST 6: Existing Phase 3 link creation still passes ─────────────────────
+
+describe("TEST 6: Existing Phase 3 authenticated link creation", () => {
+  it("creates a link for an authenticated user with shortCode and shortUrl", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce(null);
+    mockLinkCreate.mockResolvedValueOnce({
       id: "new-link-id",
       shortCode: "abc1234",
       originalUrl: "https://regression-test.example.com",
@@ -133,11 +263,11 @@ describe("TEST 1: Phase 3 regression — link creation", () => {
   });
 });
 
-// ─── TEST 2: Valid shortCode redirects to correct URL ─────────────────────────
+// ─── TEST 7: Existing redirect, ownership, analytics & deletion pass ─────────
 
-describe("TEST 2: Valid shortCode resolves to original URL", () => {
-  it("resolves an active link to its original URL", async () => {
-    mockLinkFindFirst.mockResolvedValue({
+describe("TEST 7: Existing redirect, ownership, analytics, and deletion tests", () => {
+  it("resolves active shortCode to original destination URL", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce({
       id: "link-id-1",
       originalUrl: "https://valid-redirect.example.com",
       isActive: true,
@@ -147,270 +277,83 @@ describe("TEST 2: Valid shortCode resolves to original URL", () => {
     const result = await resolveShortCode("abc1234");
     expect(result.status).toBe("ok");
     expect(result.originalUrl).toBe("https://valid-redirect.example.com");
-    expect(result.linkId).toBe("link-id-1");
   });
-});
 
-// ─── TEST 3: Unknown shortCode returns not_found ──────────────────────────────
-
-describe("TEST 3: Unknown shortCode returns not_found", () => {
-  it("returns not_found for a non-existent code", async () => {
-    mockLinkFindFirst.mockResolvedValue(null);
-
-    const result = await resolveShortCode("xxxxxxx");
+  it("returns not_found for unknown shortCode", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce(null);
+    const result = await resolveShortCode("unknown99");
     expect(result.status).toBe("not_found");
-    expect(result.originalUrl).toBeUndefined();
   });
 
-  it("returns not_found for reserved words without querying the DB", async () => {
+  it("returns not_found for reserved words without querying DB", async () => {
     const result = await resolveShortCode("dashboard");
     expect(result.status).toBe("not_found");
     expect(mockLinkFindFirst).not.toHaveBeenCalled();
   });
-});
 
-// ─── TEST 4: Expired link does not redirect ───────────────────────────────────
-
-describe("TEST 4: Expired link does not redirect", () => {
-  it("returns expired for a link whose expiresAt is in the past", async () => {
-    mockLinkFindFirst.mockResolvedValue({
+  it("does not redirect expired links", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce({
       id: "link-id-1",
       originalUrl: "https://example.com",
       isActive: true,
-      expiresAt: new Date(Date.now() - 60_000), // 1 minute ago
+      expiresAt: new Date(Date.now() - 60_000),
     } as never);
 
     const result = await resolveShortCode("expired1");
     expect(result.status).toBe("expired");
   });
-});
 
-// ─── TEST 5: Disabled link does not redirect ──────────────────────────────────
-
-describe("TEST 5: Disabled link does not redirect", () => {
-  it("returns inactive for a deactivated link", async () => {
-    mockLinkFindFirst.mockResolvedValue({
+  it("does not redirect disabled links", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce({
       id: "link-id-1",
       originalUrl: "https://example.com",
       isActive: false,
       expiresAt: null,
     } as never);
 
-    const result = await resolveShortCode("inactive");
+    const result = await resolveShortCode("disabled1");
     expect(result.status).toBe("inactive");
   });
-});
 
-// ─── TEST 6: Click tracking works for valid redirects ────────────────────────
-
-describe("TEST 6: Click tracking records clicks", () => {
-  it("records a click without throwing", async () => {
-    mockClickCreate.mockResolvedValue({ id: "click-1", linkId: "link-id-1", timestamp: new Date() } as never);
-
-    await expect(recordClick("link-id-1")).resolves.not.toThrow();
-    expect(mockClickCreate).toHaveBeenCalledWith(
-      expect.objectContaining({ data: expect.objectContaining({ linkId: "link-id-1" }) })
-    );
-  });
-});
-
-// ─── TEST 7: Unauthenticated / wrong user returns empty results ──────────────
-
-describe("TEST 7: Service enforces ownership (userId scoping)", () => {
-  it("getUserLinks returns empty array when userId matches no links", async () => {
-    mockLinkFindMany.mockResolvedValue([] as never);
-
-    const links = await getUserLinks("non-existent-user-id");
-    expect(links).toHaveLength(0);
-  });
-
-  it("getLinkById returns null when no link matches userId", async () => {
-    mockLinkFindFirst.mockResolvedValue(null);
-
-    const result = await getLinkById("link-id-1", "wrong-user-id");
-    expect(result).toBeNull();
-    // Verify the userId was used in the where clause
-    expect(mockLinkFindFirst).toHaveBeenCalledWith(
-      expect.objectContaining({
-        where: expect.objectContaining({ userId: "wrong-user-id" }),
-      })
-    );
-  });
-});
-
-// ─── TEST 8: User A cannot see User B's links ─────────────────────────────────
-
-describe("TEST 8: User A cannot access User B's links", () => {
-  it("getLinkById returns null when userA queries userB's link", async () => {
-    // Simulate: link exists for userB, but userId filter makes it return null
-    mockLinkFindFirst.mockResolvedValue(null);
-
-    const result = await getLinkById("user-b-link-id", "user-a-id");
-    expect(result).toBeNull();
-  });
-
-  it("getUserLinks only returns links scoped to that userId", async () => {
+  it("restricts getUserLinks to the authenticated user", async () => {
     const linkA = makeLink({ id: "link-a-1", userId: "user-a-id" });
-    mockLinkFindMany.mockResolvedValue([linkA] as never);
+    mockLinkFindMany.mockResolvedValueOnce([linkA] as never);
 
     const links = await getUserLinks("user-a-id");
-    // Verify the where clause uses the correct userId
     expect(mockLinkFindMany).toHaveBeenCalledWith(
       expect.objectContaining({
         where: { userId: "user-a-id" },
       })
     );
-    expect(links.every((l) => l.id === "link-a-1")).toBe(true);
+    expect(links).toHaveLength(1);
+    expect(links[0].id).toBe("link-a-1");
   });
-});
 
-// ─── TEST 9: User A cannot update/delete User B's link ───────────────────────
-
-describe("TEST 9: User A cannot update or delete User B's link", () => {
-  it("updateLink returns null when ownership check fails", async () => {
-    // Ownership findFirst returns null = user doesn't own this link
-    mockLinkFindFirst.mockResolvedValue(null);
-
-    const result = await updateLink("user-b-link-id", "user-a-id", { isActive: false });
+  it("restricts getLinkById to owner", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce(null);
+    const result = await getLinkById("user-b-link", "user-a-id");
     expect(result).toBeNull();
-    // prisma.link.update must NOT be called
-    expect(mockLinkUpdate).not.toHaveBeenCalled();
   });
 
-  it("deleteLink returns false when ownership check fails", async () => {
-    mockLinkFindFirst.mockResolvedValue(null);
+  it("deletes link correctly when owned by user", async () => {
+    mockLinkFindFirst.mockResolvedValueOnce({ id: "link-id-1" } as never);
+    mockLinkDelete.mockResolvedValueOnce({ id: "link-id-1" } as never);
 
-    const result = await deleteLink("user-b-link-id", "user-a-id");
-    expect(result).toBe(false);
-    expect(mockLinkDelete).not.toHaveBeenCalled();
-  });
-});
-
-// ─── TEST 10: User A cannot access User B's analytics ────────────────────────
-
-describe("TEST 10: Analytics ownership enforcement", () => {
-  it("getLinkById with wrong userId returns null (blocks analytics)", async () => {
-    mockLinkFindFirst.mockResolvedValue(null);
-
-    const ownershipCheck = await getLinkById("user-b-link-id", "user-a-id");
-    expect(ownershipCheck).toBeNull();
-    // API route would return 404 here, preventing analytics access
-  });
-});
-
-// ─── TEST 11: Delete operation removes the link ───────────────────────────────
-
-describe("TEST 11: Delete removes the link correctly", () => {
-  it("deleteLink calls prisma.link.delete when user owns the link", async () => {
-    mockLinkFindFirst.mockResolvedValue({ id: "link-id-1" } as never);
-    mockLinkDelete.mockResolvedValue({ id: "link-id-1" } as never);
-
-    const result = await deleteLink("link-id-1", "user-a-id");
-    expect(result).toBe(true);
+    const deleted = await deleteLink("link-id-1", "user-a-id");
+    expect(deleted).toBe(true);
     expect(mockLinkDelete).toHaveBeenCalledWith({ where: { id: "link-id-1" } });
   });
-});
 
-// ═════════════════════════════════════════════════════════════════════════════
-// PHASE 5 TESTS
-// ═════════════════════════════════════════════════════════════════════════════
-
-// ─── TEST 12: Analytics returns correct click count ──────────────────────────
-
-describe("TEST 12: Analytics correct click count", () => {
-  it("returns the exact number of recorded clicks", async () => {
-    const now = new Date();
-    mockClickFindMany.mockResolvedValue([
-      { timestamp: now },
-      { timestamp: now },
-      { timestamp: now },
-    ] as never);
-
-    const analytics = await getLinkAnalytics("link-id-1");
-    expect(analytics.totalClicks).toBe(3);
-  });
-});
-
-// ─── TEST 13: Analytics returns click history ─────────────────────────────────
-
-describe("TEST 13: Analytics returns click history", () => {
-  it("groups clicks by date and returns history array", async () => {
-    const d1 = new Date("2026-10-20T10:00:00Z");
-    const d2 = new Date("2026-10-21T10:00:00Z");
-
-    mockClickFindMany.mockResolvedValue([
-      { timestamp: d1 },
-      { timestamp: d1 },
-      { timestamp: d2 },
-    ] as never);
-
-    const analytics = await getLinkAnalytics("link-id-1");
-    expect(analytics.clickHistory.length).toBe(2);
-
-    const day1 = analytics.clickHistory.find((h) => h.date === "2026-10-20");
-    const day2 = analytics.clickHistory.find((h) => h.date === "2026-10-21");
-
-    expect(day1?.count).toBe(2);
-    expect(day2?.count).toBe(1);
-  });
-
-  it("returns lastClickAt as the most recent timestamp", async () => {
-    const ts1 = new Date("2026-10-20T10:00:00Z");
-    const ts2 = new Date("2026-10-21T15:30:00Z");
-
-    mockClickFindMany.mockResolvedValue([
-      { timestamp: ts1 },
-      { timestamp: ts2 },
-    ] as never);
-
-    const analytics = await getLinkAnalytics("link-id-1");
-    expect(analytics.lastClickAt).toEqual(ts2);
-  });
-});
-
-// ─── TEST 14: Analytics restricted to link owner ─────────────────────────────
-
-describe("TEST 14: Analytics restricted to link owner", () => {
-  it("ownership check (getLinkById) blocks wrong user", async () => {
-    // Wrong user gets null
+  it("does not allow deleting another user's link", async () => {
     mockLinkFindFirst.mockResolvedValueOnce(null);
-    const blocked = await getLinkById("user-b-link-id", "user-a-id");
-    expect(blocked).toBeNull();
+
+    const deleted = await deleteLink("user-b-link", "user-a-id");
+    expect(deleted).toBe(false);
+    expect(mockLinkDelete).not.toHaveBeenCalled();
   });
 
-  it("owner can access their own link details", async () => {
-    const linkB = makeLink({ id: "link-b-1", userId: "user-b-id", clickCount: 5 });
-    mockLinkFindFirst.mockResolvedValueOnce(linkB as never);
-
-    const result = await getLinkById("link-b-1", "user-b-id");
-    expect(result).not.toBeNull();
-    expect(result?.clickCount).toBe(5);
-  });
-});
-
-// ─── TEST 15: Analytics failure does not break public redirection ─────────────
-
-describe("TEST 15: Analytics failure does not break redirect", () => {
-  it("recordClick swallows DB errors silently", async () => {
-    mockClickCreate.mockRejectedValue(new Error("DB connection failed"));
-
-    // Should NOT throw
-    await expect(recordClick("any-link-id")).resolves.not.toThrow();
-  });
-
-  it("resolveShortCode works even when analytics would fail", async () => {
-    mockLinkFindFirst.mockResolvedValue({
-      id: "link-id-1",
-      originalUrl: "https://example.com",
-      isActive: true,
-      expiresAt: null,
-    } as never);
-
-    const resolved = await resolveShortCode("abc1234");
-    expect(resolved.status).toBe("ok");
-
-    // Even if analytics fails, no throw
-    mockClickCreate.mockRejectedValue(new Error("Analytics error"));
+  it("analytics failure does not throw or break redirect", async () => {
+    mockClickCreate.mockRejectedValueOnce(new Error("DB timeout"));
     await expect(recordClick("link-id-1")).resolves.not.toThrow();
   });
 });

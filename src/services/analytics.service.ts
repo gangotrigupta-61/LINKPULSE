@@ -9,17 +9,22 @@ export interface RecordClickOptions {
 /**
  * Record a click event for a given link.
  * Fails silently — analytics failures must not break redirect.
+ * Does NOT collect or store raw IP addresses.
  */
 export async function recordClick(
   linkId: string,
   options?: RecordClickOptions
 ): Promise<void> {
   try {
+    const trimmedReferrer = options?.referrer?.trim()
+      ? options.referrer.trim().slice(0, 500)
+      : null;
+
     await prisma.click.create({
       data: {
         linkId,
         timestamp: new Date(),
-        referrer: options?.referrer ? options.referrer.slice(0, 500) : null,
+        referrer: trimmedReferrer,
         deviceType: options?.deviceType ?? null,
         browser: options?.browser ?? null,
       },
@@ -30,13 +35,19 @@ export async function recordClick(
   }
 }
 
+export interface ReferrerMetric {
+  referrer: string;
+  count: number;
+}
+
 export interface ClickSummary {
   totalClicks: number;
   lastClickAt: Date | null;
   clickHistory: { date: string; count: number }[];
+  topReferrers: ReferrerMetric[];
   devices?: { device: string; count: number }[];
   browsers?: { browser: string; count: number }[];
-  referrers?: { referrer: string; count: number }[];
+  referrers?: ReferrerMetric[];
 }
 
 /**
@@ -75,14 +86,18 @@ export async function getLinkAnalytics(linkId: string): Promise<ClickSummary> {
     if (c.browser) {
       countByBrowser[c.browser] = (countByBrowser[c.browser] ?? 0) + 1;
     }
-    if (c.referrer) {
+
+    // Safely label missing or empty referrer as "Direct"
+    let refKey = "Direct";
+    if (c.referrer && c.referrer.trim()) {
       try {
-        const host = new URL(c.referrer).hostname;
-        countByReferrer[host] = (countByReferrer[host] ?? 0) + 1;
+        const parsed = new URL(c.referrer);
+        refKey = parsed.hostname || c.referrer.trim();
       } catch {
-        countByReferrer[c.referrer] = (countByReferrer[c.referrer] ?? 0) + 1;
+        refKey = c.referrer.trim().slice(0, 100);
       }
     }
+    countByReferrer[refKey] = (countByReferrer[refKey] ?? 0) + 1;
   }
 
   const clickHistory = Object.entries(countByDate).map(([date, count]) => ({
@@ -100,10 +115,20 @@ export async function getLinkAnalytics(linkId: string): Promise<ClickSummary> {
     count,
   }));
 
-  const referrers = Object.entries(countByReferrer).map(([referrer, count]) => ({
-    referrer,
-    count,
-  }));
+  const topReferrers = Object.entries(countByReferrer)
+    .map(([referrer, count]) => ({
+      referrer,
+      count,
+    }))
+    .sort((a, b) => b.count - a.count);
 
-  return { totalClicks, lastClickAt, clickHistory, devices, browsers, referrers };
+  return {
+    totalClicks,
+    lastClickAt,
+    clickHistory,
+    topReferrers,
+    devices,
+    browsers,
+    referrers: topReferrers,
+  };
 }

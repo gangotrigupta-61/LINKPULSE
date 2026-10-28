@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { z } from "zod";
+import { prisma } from "@/lib/prisma";
+import { updateLinkSchema } from "@/validators/link.validators";
 import {
   getLinkById,
   updateLink,
@@ -23,8 +24,24 @@ export async function GET(_req: Request, { params }: RouteContext) {
     }
 
     const { id } = await params;
-    const link = await getLinkById(id, session.user.id);
 
+    const existing = await prisma.link.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Link not found." }, { status: 404 });
+    }
+
+    if (existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You do not have permission to access this link." },
+        { status: 403 }
+      );
+    }
+
+    const link = await getLinkById(id, session.user.id);
     if (!link) {
       return NextResponse.json({ error: "Link not found." }, { status: 404 });
     }
@@ -39,24 +56,7 @@ export async function GET(_req: Request, { params }: RouteContext) {
   }
 }
 
-const updateSchema = z.object({
-  title: z.string().trim().max(100).nullable().optional(),
-  isActive: z.boolean().optional(),
-  expiresAt: z
-    .string()
-    .nullable()
-    .optional()
-    .refine(
-      (val) => {
-        if (val == null || val === "") return true;
-        const d = new Date(val);
-        return !isNaN(d.getTime());
-      },
-      { message: "expiresAt must be a valid date string or null" }
-    ),
-});
-
-// PATCH /api/links/[id] — update title / active state / expiry (owner only)
+// PATCH /api/links/[id] — update destination URL / title / active state / expiry (owner only)
 export async function PATCH(req: Request, { params }: RouteContext) {
   try {
     const session = await auth();
@@ -77,7 +77,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
       );
     }
 
-    const parsed = updateSchema.safeParse(body);
+    const parsed = updateLinkSchema.safeParse(body);
     if (!parsed.success) {
       return NextResponse.json(
         { error: parsed.error.issues[0]?.message ?? "Invalid input." },
@@ -86,11 +86,30 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     }
 
     const { id } = await params;
+
+    const existing = await prisma.link.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Link not found." }, { status: 404 });
+    }
+
+    if (existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You do not have permission to modify this link." },
+        { status: 403 }
+      );
+    }
+
     const d = parsed.data;
+    const destUrl = d.originalUrl || d.url;
 
     const updated = await updateLink(id, session.user.id, {
       ...(d.title !== undefined ? { title: d.title } : {}),
       ...(d.isActive !== undefined ? { isActive: d.isActive } : {}),
+      ...(destUrl !== undefined ? { originalUrl: destUrl } : {}),
       ...(d.expiresAt !== undefined
         ? {
             expiresAt:
@@ -127,8 +146,24 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
     }
 
     const { id } = await params;
-    const deleted = await deleteLink(id, session.user.id);
 
+    const existing = await prisma.link.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Link not found." }, { status: 404 });
+    }
+
+    if (existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You do not have permission to delete this link." },
+        { status: 403 }
+      );
+    }
+
+    const deleted = await deleteLink(id, session.user.id);
     if (!deleted) {
       return NextResponse.json({ error: "Link not found." }, { status: 404 });
     }
@@ -142,4 +177,3 @@ export async function DELETE(_req: Request, { params }: RouteContext) {
     );
   }
 }
-

@@ -101,6 +101,7 @@ export interface UpdateLinkParams {
   title?: string | null;
   isActive?: boolean;
   expiresAt?: Date | null;
+  originalUrl?: string;
 }
 
 /**
@@ -126,6 +127,9 @@ export async function updateLink(
       ...(params.isActive !== undefined ? { isActive: params.isActive } : {}),
       ...(params.expiresAt !== undefined
         ? { expiresAt: params.expiresAt }
+        : {}),
+      ...(params.originalUrl !== undefined
+        ? { originalUrl: params.originalUrl }
         : {}),
     },
     select: {

@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/prisma";
 import { getLinkById } from "@/services/link-management.service";
 import { getLinkAnalytics } from "@/services/analytics.service";
 
@@ -20,7 +21,22 @@ export async function GET(_req: Request, { params }: RouteContext) {
 
     const { id } = await params;
 
-    // Verify ownership — getLinkById returns null if wrong user
+    const existing = await prisma.link.findUnique({
+      where: { id },
+      select: { userId: true },
+    });
+
+    if (!existing) {
+      return NextResponse.json({ error: "Link not found." }, { status: 404 });
+    }
+
+    if (existing.userId !== session.user.id) {
+      return NextResponse.json(
+        { error: "Forbidden: You do not have permission to access analytics for this link." },
+        { status: 403 }
+      );
+    }
+
     const link = await getLinkById(id, session.user.id);
     if (!link) {
       return NextResponse.json({ error: "Link not found." }, { status: 404 });
@@ -40,9 +56,10 @@ export async function GET(_req: Request, { params }: RouteContext) {
       totalClicks: analytics.totalClicks,
       lastClickAt: analytics.lastClickAt,
       clickHistory: analytics.clickHistory,
+      topReferrers: analytics.topReferrers,
       devices: analytics.devices,
       browsers: analytics.browsers,
-      referrers: analytics.referrers,
+      referrers: analytics.topReferrers,
     });
   } catch (err) {
     console.error("[GET /api/links/[id]/analytics]", err);
@@ -52,4 +69,3 @@ export async function GET(_req: Request, { params }: RouteContext) {
     );
   }
 }
-

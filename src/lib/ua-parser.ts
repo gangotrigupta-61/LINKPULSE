@@ -44,3 +44,4 @@ export function parseUserAgent(uaString: string | null | undefined): ParsedUserA
 
   return { deviceType, browser };
 }
+
