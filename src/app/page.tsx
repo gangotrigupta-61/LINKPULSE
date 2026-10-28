@@ -15,6 +15,13 @@ export default function Home() {
           <span>TypeScript</span>
           <span>App Router</span>
         </div>
+        <div className="placeholder-stack" style={{ marginTop: "var(--space-4)" }}>
+          <a href="/login" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Log In</a>
+          <span style={{ color: "var(--color-border)" }}>•</span>
+          <a href="/register" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Register</a>
+          <span style={{ color: "var(--color-border)" }}>•</span>
+          <a href="/dashboard" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Dashboard</a>
+        </div>
       </div>
     </main>
   );

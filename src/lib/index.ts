@@ -13,3 +13,4 @@
  */
 
 export { prisma, default as defaultPrisma } from "./prisma";
+export { auth, signIn, signOut, handlers } from "./auth";
