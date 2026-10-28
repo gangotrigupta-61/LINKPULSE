@@ -12,4 +12,4 @@
  * Phase 3 — reserved.ts    (Blocked alias list)
  */
 
-export {};
+export { prisma, default as defaultPrisma } from "./prisma";
