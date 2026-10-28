@@ -1,6 +1,7 @@
 import { auth, signOut } from "@/lib/auth";
 import Link from "next/link";
 import { CreateLinkForm } from "@/components/create-link-form";
+import { MyLinksSection } from "@/components/my-links-section";
 
 export default async function DashboardPage() {
   const session = await auth();
@@ -45,6 +46,9 @@ export default async function DashboardPage() {
 
         {/* Phase 3: Link Creation Interface */}
         <CreateLinkForm />
+
+        {/* Phase 4/5: My Links list + analytics */}
+        <MyLinksSection />
 
         <form
           action={async () => {

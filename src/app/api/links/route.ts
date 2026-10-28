@@ -1,9 +1,33 @@
 import { NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
-import { createLinkSchema } from "@/validators/link.validators";
+import { getUserLinks } from "@/services/link-management.service";
 import { createLink, AliasConflictError } from "@/services/links.service";
+import { createLinkSchema } from "@/validators/link.validators";
 import { checkLinkCreateRateLimit } from "@/lib/ratelimit";
 
+// GET /api/links — list authenticated user's links
+export async function GET() {
+  try {
+    const session = await auth();
+    if (!session?.user?.id) {
+      return NextResponse.json(
+        { error: "Authentication required." },
+        { status: 401 }
+      );
+    }
+
+    const links = await getUserLinks(session.user.id);
+    return NextResponse.json(links);
+  } catch (err) {
+    console.error("[GET /api/links]", err);
+    return NextResponse.json(
+      { error: "Internal server error." },
+      { status: 500 }
+    );
+  }
+}
+
+// POST /api/links — create a new link (existing Phase 3 handler preserved below)
 export async function POST(req: Request) {
   try {
     // 1. Verify authentication strictly server-side

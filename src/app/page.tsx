@@ -1,3 +1,5 @@
+import Link from "next/link";
+
 export default function Home() {
   return (
     <main className="placeholder-page">
@@ -16,11 +18,11 @@ export default function Home() {
           <span>App Router</span>
         </div>
         <div className="placeholder-stack" style={{ marginTop: "var(--space-4)" }}>
-          <a href="/login" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Log In</a>
+          <Link href="/login" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Log In</Link>
           <span style={{ color: "var(--color-border)" }}>•</span>
-          <a href="/register" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Register</a>
+          <Link href="/register" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Register</Link>
           <span style={{ color: "var(--color-border)" }}>•</span>
-          <a href="/dashboard" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Dashboard</a>
+          <Link href="/dashboard" className="auth-link" style={{ fontSize: "var(--text-sm)" }}>Dashboard</Link>
         </div>
       </div>
     </main>

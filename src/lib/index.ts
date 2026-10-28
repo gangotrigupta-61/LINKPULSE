@@ -17,3 +17,4 @@ export { auth, signIn, signOut, handlers } from "./auth";
 export { generateShortCode } from "./nanoid";
 export { isReservedWord, RESERVED_WORDS } from "./reserved-words";
 export { checkLinkCreateRateLimit } from "./ratelimit";
+export { parseUserAgent, type ParsedUserAgent } from "./ua-parser";
