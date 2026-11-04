@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback } from "react";
+import Link from "next/link";
 
 interface LinkItem {
   id: string;
@@ -80,11 +81,14 @@ function EditLinkModal({
 }) {
   const [originalUrl, setOriginalUrl] = useState(link.originalUrl);
   const [title, setTitle] = useState(link.title || "");
+  const [alias, setAlias] = useState(link.shortCode);
   const [expiresAt, setExpiresAt] = useState(
     link.expiresAt ? new Date(link.expiresAt).toISOString().slice(0, 16) : ""
   );
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+
+  const aliasChanged = alias.trim() !== link.shortCode;
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -101,16 +105,33 @@ function EditLinkModal({
       return;
     }
 
+    const trimmedAlias = alias.trim();
+    if (trimmedAlias && trimmedAlias.length < 3) {
+      setError("Custom alias must be at least 3 characters.");
+      return;
+    }
+
+    if (trimmedAlias && !/^[a-zA-Z0-9_-]+$/.test(trimmedAlias)) {
+      setError("Custom alias can only contain letters, numbers, hyphens (-), and underscores (_)");
+      return;
+    }
+
     setSaving(true);
     try {
+      const payload: Record<string, unknown> = {
+        originalUrl: trimmedUrl,
+        title: title.trim() || null,
+        expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
+      };
+
+      if (aliasChanged && trimmedAlias) {
+        payload.alias = trimmedAlias;
+      }
+
       const res = await fetch(`/api/links/${link.id}`, {
         method: "PATCH",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          originalUrl: trimmedUrl,
-          title: title.trim() || null,
-          expiresAt: expiresAt ? new Date(expiresAt).toISOString() : null,
-        }),
+        body: JSON.stringify(payload),
       });
 
       const data = await res.json();
@@ -186,18 +207,25 @@ function EditLinkModal({
 
         <form onSubmit={handleSubmit} className="auth-form" noValidate>
           <div className="form-group">
-            <label className="form-label">Short Code (unchangeable)</label>
+            <label htmlFor="edit-modal-alias" className="form-label">
+              Short Code / Custom Alias
+            </label>
             <input
+              id="edit-modal-alias"
               type="text"
-              readOnly
-              value={link.shortCode}
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
               className="form-input"
+              disabled={saving}
               style={{
-                background: "var(--color-surface-2)",
-                color: "var(--color-text-muted)",
                 fontFamily: "var(--font-mono)",
               }}
             />
+            {aliasChanged && (
+              <div className="alias-warning" role="alert" style={{ marginTop: "var(--space-2)" }}>
+                ⚠️ <strong>Warning:</strong> Changing the alias changes the public URL. Existing links will break.
+              </div>
+            )}
           </div>
 
           <div className="form-group">
@@ -776,7 +804,7 @@ function LinkCard({
       </div>
 
       {/* Action buttons */}
-      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap" }}>
+      <div style={{ display: "flex", gap: "var(--space-2)", flexWrap: "wrap", alignItems: "center" }}>
         <button
           onClick={handleCopy}
           className="form-button"
@@ -804,10 +832,29 @@ function LinkCard({
             border: "1px solid var(--color-border)",
             color: "var(--color-text)",
           }}
-          title="Edit destination URL and details"
+          title="Quick edit modal"
         >
           ✏️ Edit
         </button>
+
+        <Link
+          href={`/links/${link.id}`}
+          className="form-button"
+          style={{
+            width: "auto",
+            padding: "var(--space-2) var(--space-3)",
+            fontSize: "var(--text-xs)",
+            background: "rgba(108, 99, 255, 0.15)",
+            border: "1px solid rgba(108, 99, 255, 0.35)",
+            color: "var(--color-accent)",
+            textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+          }}
+          title="View full dedicated analytics"
+        >
+          📊 Full Analytics
+        </Link>
 
         <button
           onClick={() => onAnalytics(link.id)}
@@ -818,11 +865,11 @@ function LinkCard({
             fontSize: "var(--text-xs)",
             background: "var(--color-surface)",
             border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
+            color: "var(--color-text-muted)",
           }}
-          title="View analytics"
+          title="Quick analytics popup"
         >
-          📊 Analytics
+          Quick View
         </button>
 
         <button
@@ -950,6 +997,11 @@ export function MyLinksSection() {
     setLinks((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
   }
 
+  // Aggregate summary statistics
+  const totalLinks = links.length;
+  const totalClicks = links.reduce((sum, l) => sum + (l.clickCount || 0), 0);
+  const activeLinks = links.filter((l) => l.isActive && !l.isExpired).length;
+
   return (
     <div
       style={{
@@ -959,6 +1011,66 @@ export function MyLinksSection() {
         marginTop: "var(--space-6)",
       }}
     >
+      {/* Summary statistics bar */}
+      <div
+        style={{
+          display: "grid",
+          gridTemplateColumns: "repeat(3, 1fr)",
+          gap: "var(--space-3)",
+        }}
+      >
+        <div
+          style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--color-accent)" }}>
+            {loading ? "…" : totalLinks}
+          </div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Total Links
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--color-accent-2)" }}>
+            {loading ? "…" : totalClicks}
+          </div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Total Clicks
+          </div>
+        </div>
+
+        <div
+          style={{
+            background: "var(--color-surface-2)",
+            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius-md)",
+            padding: "var(--space-3)",
+            textAlign: "center",
+          }}
+        >
+          <div style={{ fontSize: "var(--text-2xl)", fontWeight: "var(--font-bold)", color: "var(--color-success)" }}>
+            {loading ? "…" : activeLinks}
+          </div>
+          <div style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)", textTransform: "uppercase", letterSpacing: "0.05em" }}>
+            Active Links
+          </div>
+        </div>
+      </div>
+
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
         <h2 style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-bold)" }}>
           My Links
@@ -981,15 +1093,25 @@ export function MyLinksSection() {
       </div>
 
       {loading && (
-        <div
-          style={{
-            textAlign: "center",
-            color: "var(--color-text-muted)",
-            fontSize: "var(--text-sm)",
-            padding: "var(--space-8)",
-          }}
-        >
-          Loading your links…
+        <div style={{ display: "flex", flexDirection: "column", gap: "var(--space-3)" }}>
+          {[1, 2].map((i) => (
+            <div
+              key={i}
+              style={{
+                height: "100px",
+                background: "var(--color-surface-2)",
+                border: "1px solid var(--color-border)",
+                borderRadius: "var(--radius-md)",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                color: "var(--color-text-muted)",
+                fontSize: "var(--text-xs)",
+              }}
+            >
+              Loading short link…
+            </div>
+          ))}
         </div>
       )}
 

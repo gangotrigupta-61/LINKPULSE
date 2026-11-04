@@ -86,6 +86,20 @@ export const updateLinkSchema = z.object({
       },
       { message: "Expiry date must be a valid date string or null" }
     ),
+  alias: z
+    .string()
+    .trim()
+    .min(3, "Custom alias must be at least 3 characters")
+    .max(50, "Custom alias cannot exceed 50 characters")
+    .regex(
+      /^[a-zA-Z0-9_-]+$/,
+      "Custom alias can only contain letters, numbers, hyphens (-), and underscores (_)"
+    )
+    .refine((val) => !isReservedWord(val), {
+      message: "This alias is a reserved route and cannot be used",
+    })
+    .optional()
+    .or(z.literal("")),
 });
 
 export type UpdateLinkInput = z.infer<typeof updateLinkSchema>;

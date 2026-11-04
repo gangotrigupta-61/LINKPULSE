@@ -7,7 +7,6 @@ import {
   updateLink,
   deleteLink,
 } from "@/services/link-management.service";
-
 interface RouteContext {
   params: Promise<{ id: string }>;
 }
@@ -106,6 +105,23 @@ export async function PATCH(req: Request, { params }: RouteContext) {
     const d = parsed.data;
     const destUrl = d.originalUrl || d.url;
 
+    // Handle alias (shortCode) change with case-insensitive uniqueness check
+    if (d.alias && d.alias !== "") {
+      const aliasConflict = await prisma.link.findFirst({
+        where: {
+          shortCode: { equals: d.alias, mode: "insensitive" },
+          NOT: { id },
+        },
+        select: { id: true },
+      });
+      if (aliasConflict) {
+        return NextResponse.json(
+          { error: "This alias is already taken. Please choose a different one." },
+          { status: 409 }
+        );
+      }
+    }
+
     const updated = await updateLink(id, session.user.id, {
       ...(d.title !== undefined ? { title: d.title } : {}),
       ...(d.isActive !== undefined ? { isActive: d.isActive } : {}),
@@ -118,6 +134,7 @@ export async function PATCH(req: Request, { params }: RouteContext) {
                 : new Date(d.expiresAt),
           }
         : {}),
+      ...(d.alias && d.alias !== "" ? { alias: d.alias } : {}),
     });
 
     if (!updated) {

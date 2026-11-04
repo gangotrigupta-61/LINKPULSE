@@ -5,8 +5,8 @@ import { createLink, AliasConflictError } from "@/services/links.service";
 import { createLinkSchema } from "@/validators/link.validators";
 import { checkLinkCreateRateLimit } from "@/lib/ratelimit";
 
-// GET /api/links — list authenticated user's links
-export async function GET() {
+// GET /api/links — list authenticated user's links (with optional pagination)
+export async function GET(req: Request) {
   try {
     const session = await auth();
     if (!session?.user?.id) {
@@ -16,7 +16,24 @@ export async function GET() {
       );
     }
 
+    const { searchParams } = new URL(req.url);
+    const pageParam = searchParams.get("page");
+    const limitParam = searchParams.get("limit");
+
     const links = await getUserLinks(session.user.id);
+
+    // If pagination params provided, slice results and return pagination metadata
+    if (pageParam || limitParam) {
+      const page = Math.max(1, parseInt(pageParam ?? "1", 10) || 1);
+      const limit = Math.min(100, Math.max(1, parseInt(limitParam ?? "20", 10) || 20));
+      const total = links.length;
+      const totalPages = Math.ceil(total / limit);
+      const start = (page - 1) * limit;
+      const sliced = links.slice(start, start + limit);
+      return NextResponse.json({ links: sliced, total, page, totalPages });
+    }
+
+    // Default: return all links as array (backward compatible)
     return NextResponse.json(links);
   } catch (err) {
     console.error("[GET /api/links]", err);

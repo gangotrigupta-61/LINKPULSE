@@ -2,13 +2,19 @@ import { auth, signOut } from "@/lib/auth";
 import Link from "next/link";
 import { CreateLinkForm } from "@/components/create-link-form";
 import { MyLinksSection } from "@/components/my-links-section";
+import type { Metadata } from "next";
+
+export const metadata: Metadata = {
+  title: "Dashboard | LinkPulse",
+  description: "Manage your links and view analytics on your LinkPulse dashboard.",
+};
 
 export default async function DashboardPage() {
   const session = await auth();
 
   return (
     <main className="auth-page">
-      <div className="auth-card" style={{ maxWidth: "560px" }}>
+      <div className="auth-card" style={{ maxWidth: "680px" }}>
         <div className="auth-header">
           <span className="placeholder-badge">Protected Area</span>
           <h1 className="auth-title">Dashboard</h1>
