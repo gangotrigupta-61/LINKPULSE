@@ -1,4 +1,5 @@
 import { prisma } from "@/lib/prisma";
+import { getBaseUrl } from "@/lib/base-url";
 
 export interface SafeLink {
   id: string;
@@ -33,17 +34,14 @@ export async function getUserLinks(userId: string): Promise<SafeLink[]> {
     },
   });
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   const now = Date.now();
 
   return links.map((l) => ({
     id: l.id,
     shortCode: l.shortCode,
-    shortUrl: `${baseUrl.replace(/\/+$/, "")}/${l.shortCode}`,
+    shortUrl: `${baseUrl}/${l.shortCode}`,
     originalUrl: l.originalUrl,
     title: l.title,
     expiresAt: l.expiresAt,
@@ -78,15 +76,12 @@ export async function getLinkById(
 
   if (!link) return null;
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   return {
     id: link.id,
     shortCode: link.shortCode,
-    shortUrl: `${baseUrl.replace(/\/+$/, "")}/${link.shortCode}`,
+    shortUrl: `${baseUrl}/${link.shortCode}`,
     originalUrl: link.originalUrl,
     title: link.title,
     expiresAt: link.expiresAt,
@@ -148,15 +143,12 @@ export async function updateLink(
     },
   });
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   return {
     id: updated.id,
     shortCode: updated.shortCode,
-    shortUrl: `${baseUrl.replace(/\/+$/, "")}/${updated.shortCode}`,
+    shortUrl: `${baseUrl}/${updated.shortCode}`,
     originalUrl: updated.originalUrl,
     title: updated.title,
     expiresAt: updated.expiresAt,

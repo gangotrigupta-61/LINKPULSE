@@ -4,7 +4,7 @@ import { Redis } from "@upstash/redis";
 const UPSTASH_URL = process.env.UPSTASH_REDIS_REST_URL;
 const UPSTASH_TOKEN = process.env.UPSTASH_REDIS_REST_TOKEN;
 
-// In-memory sliding-window fallback when Upstash Redis credentials are not configured
+// In-memory sliding-window limiter for development / testing
 class InMemorySlidingWindowLimiter {
   private windows: Map<string, number[]> = new Map();
   private maxRequests: number;
@@ -50,22 +50,20 @@ let redisLimiter: Ratelimit | null = null;
 const memoryLimiter = new InMemorySlidingWindowLimiter(10, 60 * 60 * 1000); // 10 per hour
 
 if (UPSTASH_URL && UPSTASH_TOKEN) {
-  const redis = new Redis({
-    url: UPSTASH_URL,
-    token: UPSTASH_TOKEN,
-  });
+  try {
+    const redis = new Redis({
+      url: UPSTASH_URL,
+      token: UPSTASH_TOKEN,
+    });
 
-  redisLimiter = new Ratelimit({
-    redis,
-    limiter: Ratelimit.slidingWindow(10, "1 h"),
-    analytics: true,
-    prefix: "@linkpulse/ratelimit",
-  });
-} else {
-  if (process.env.NODE_ENV === "production") {
-    console.warn(
-      "[RateLimit WARNING] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN missing in production. Using memory limiter fallback."
-    );
+    redisLimiter = new Ratelimit({
+      redis,
+      limiter: Ratelimit.slidingWindow(10, "1 h"),
+      analytics: true,
+      prefix: "@linkpulse/ratelimit",
+    });
+  } catch (err) {
+    console.error("[RateLimit] Failed to initialize Upstash Redis client:", err);
   }
 }
 
@@ -77,7 +75,7 @@ export interface RateLimitResult {
 }
 
 /**
- * Check rate limit for link creation: 10 per hour per authenticated user.
+ * Check rate limit for link creation: 10 links per hour per authenticated user.
  * Identifier: link_create:{userId}
  */
 export async function checkLinkCreateRateLimit(
@@ -85,16 +83,40 @@ export async function checkLinkCreateRateLimit(
 ): Promise<RateLimitResult> {
   const identifier = `link_create:${userId}`;
 
+  // 1. Use Upstash Redis distributed sliding window when configured
   if (redisLimiter) {
-    const res = await redisLimiter.limit(identifier);
+    try {
+      const res = await redisLimiter.limit(identifier);
+      return {
+        success: res.success,
+        limit: res.limit,
+        remaining: res.remaining,
+        reset: res.reset,
+      };
+    } catch (err) {
+      // Safe fallback on Redis failure: do not crash request, log server-side error
+      console.error(
+        "[RateLimit] Upstash Redis request failed, falling back to local sliding window:",
+        err
+      );
+      return memoryLimiter.limit(identifier);
+    }
+  }
+
+  // 2. Production safety check: do not silently bypass distributed limits in production
+  if (process.env.NODE_ENV === "production") {
+    console.error(
+      "[RateLimit ERROR] UPSTASH_REDIS_REST_URL or UPSTASH_REDIS_REST_TOKEN is not configured in production environment."
+    );
+    // Fail safely with server-side rate limit constraint
     return {
-      success: res.success,
-      limit: res.limit,
-      remaining: res.remaining,
-      reset: res.reset,
+      success: false,
+      limit: 10,
+      remaining: 0,
+      reset: Date.now() + 60 * 1000,
     };
   }
 
-  // Fallback to in-memory sliding window
+  // 3. Local development and test fallback
   return memoryLimiter.limit(identifier);
 }

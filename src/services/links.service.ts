@@ -1,5 +1,6 @@
 import { prisma } from "@/lib/prisma";
 import { generateShortCode } from "@/lib/nanoid";
+import { getBaseUrl } from "@/lib/base-url";
 
 export class AliasConflictError extends Error {
   constructor(message = "This alias is already taken.") {
@@ -111,15 +112,12 @@ export async function createLink(
     },
   });
 
-  const baseUrl =
-    process.env.NEXT_PUBLIC_APP_URL ||
-    process.env.NEXTAUTH_URL ||
-    "http://localhost:3000";
+  const baseUrl = getBaseUrl();
 
   return {
     id: link.id,
     shortCode: link.shortCode,
-    shortUrl: `${baseUrl.replace(/\/+$/, "")}/${link.shortCode}`,
+    shortUrl: `${baseUrl}/${link.shortCode}`,
     originalUrl: link.originalUrl,
     title: link.title,
     expiresAt: link.expiresAt,

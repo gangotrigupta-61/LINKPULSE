@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Inter, JetBrains_Mono } from "next/font/google";
 import { Providers } from "@/components/providers";
+import { getBaseUrl } from "@/lib/base-url";
 import "@/styles/globals.css";
 
 const inter = Inter({
@@ -24,9 +25,7 @@ export const metadata: Metadata = {
     "LinkPulse is a fast, production-quality URL shortener with real-time analytics. Track clicks, devices, browsers, and referrers for every short link you create.",
   keywords: ["url shortener", "link analytics", "short links", "bitly alternative"],
   authors: [{ name: "LinkPulse" }],
-  metadataBase: new URL(
-    process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000"
-  ),
+  metadataBase: new URL(getBaseUrl()),
   openGraph: {
     title: "LinkPulse — Smart URL Shortener & Analytics",
     description:
