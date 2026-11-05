@@ -2,286 +2,89 @@
 
 **Smart URL Shortener & Real-Time Analytics**
 
-> A production-ready, full-stack URL shortener and link analytics platform built with Next.js 16 (App Router), TypeScript, Prisma ORM, Neon PostgreSQL, Auth.js, and Upstash Redis. Built as an end-to-end full-stack engineering project.
+> A production-grade, full-stack URL shortener and link analytics platform built with Next.js 16 (App Router), TypeScript, Prisma ORM, Neon PostgreSQL, Auth.js, and Upstash Redis.
 
 ---
 
 ## Live Demo & Repository
 
-- **Live Application:** `[Production URL Placeholder — e.g. https://linkpulse.vercel.app]`
-- **Repository:** `[GitHub Repository URL Placeholder]`
-- **Demo Account:**
-  - **Email:** `demo@linkpulse.io`
-  - **Password:** `DemoPassword123!`
+- **Live Application URL:** `[https://linkpulse.vercel.app]` *(Placeholder — configure after Vercel deployment)*
+- **GitHub Repository:** `[https://github.com/your-username/linkpulse]` *(Placeholder)*
+- **Demo Accounts (Public Demonstration):**
+  - **Account 1:** `demo@linkpulse.io` | Password: `Demo1234!`
+  - **Account 2:** `jane@linkpulse.io` | Password: `Demo1234!`
+
+> ⚠️ *Note: These accounts are provided strictly for demonstration and code evaluation. Do not use them for personal or production links.*
 
 ---
 
 ## 1. Project Overview
 
-LinkPulse is a fast, secure, and modern link management platform that turns long, unwieldy URLs into clean, branded short links. Every redirect captures real-time telemetry (referrers, device types, browser clients, timestamps) without introducing latency or tracking personally identifiable information (PII).
+LinkPulse addresses the fragmentation, security risks, and high cost of modern link management. Creators, marketers, and developers frequently deal with cumbersome, unbranded URLs that offer no performance visibility without expensive third-party subscriptions.
 
----
+LinkPulse delivers:
+- **Fast, Collision-Resistant Link Shortening:** Generates secure 7-character nanoid slugs or user-defined branded custom aliases.
+- **Privacy-Centric, Real-Time Analytics:** Captures click timestamps, referrers, device categories, and browser clients with zero latency overhead and without collecting raw IP addresses or personal identifiable information (PII).
+- **Enterprise-Grade Security:** Server-side authentication, salted bcrypt password hashing, per-user distributed rate limiting, and owner-isolated link management.
 
-## 2. Key Features
-
-- **⚡ Instant Short Link Creation:** Automatically generates collision-resistant 7-character nanoid slugs.
-- **🏷️ Custom Aliases:** Support for memorable, custom-branded slugs with case-insensitive uniqueness validation.
-- **🛡️ Reserved-Word Collision Protection:** Over 30 system routes (e.g., `/dashboard`, `/api`, `/login`, `/admin`) are strictly blocked from being claimed as aliases.
-- **🔒 Server-Side Authentication:** Robust email/password authentication using Auth.js (NextAuth v5) and bcrypt password hashing (cost factor 10).
-- **📊 Real-Time Analytics:** Interactive metrics covering total clicks, click trend history, top referrer sources (with safe fallback for Direct visits), device breakdown (Mobile/Desktop/Tablet), and browser distribution.
-- **✏️ Complete Link Management:** Edit destination URLs, custom aliases, titles, expiration dates, and toggle active/inactive status at any time.
-- **⏰ Expiration Dates:** Set future expiration timestamps; expired links automatically display a user-friendly expiration page.
-- **🚦 Distributed Sliding-Window Rate Limiting:** Enforces 10 link creations per user per hour via Upstash Redis with HTTP 429 and `Retry-After` header.
-- **📱 Responsive UI & Design System:** Pure CSS tokens (no heavy UI frameworks) responsive across mobile, tablet, and desktop layouts.
-- **🌱 Idempotent Seed Data:** Preloaded with sample active, inactive, and expired links with realistic analytics data.
-
----
-
-## 3. Screenshots
-
-| Landing Page | Dashboard & Link Management |
-| :---: | :---: |
-| *(Hero section, features, how-it-works)* <br> `[Screenshot Placeholder: Landing Page]` | *(Link creation form, stats bar, link cards)* <br> `[Screenshot Placeholder: Dashboard]` |
-
-| Dedicated Analytics Page | Link Settings / Edit Page |
-| :---: | :---: |
-| *(Click trends, device/browser distribution, referrers)* <br> `[Screenshot Placeholder: Analytics]` | *(Destination URL, alias change warning, expiry)* <br> `[Screenshot Placeholder: Edit Page]` |
-
----
-
-## 4. Technology Stack
-
-| Layer | Technology | Details |
-| :--- | :--- | :--- |
-| **Framework** | Next.js 16.4.3 | App Router, React Server Components, Server Actions |
-| **Language** | TypeScript 5 (Strict) | Zero `any` policy, comprehensive interface definitions |
-| **Runtime & UI** | React 19.3.0 | Modern Hooks, pure CSS design tokens |
-| **Database** | PostgreSQL | Serverless PostgreSQL via [Neon](https://neon.tech) |
-| **ORM** | Prisma 6.19.3 | Schema migrations, connection pooling, client singleton |
-| **Authentication** | Auth.js (NextAuth v5) | JWT strategy, credentials provider, secure cookie handling |
-| **Rate Limiting** | Upstash Redis | Sliding-window algorithm via `@upstash/ratelimit` |
-| **Validation** | Zod 4 | Strict input parsing & protocol sanitization (`http/https`) |
-| **Slug Generation** | nanoid 6 | 7-character URL-safe alphanumeric slugs |
-| **UA Detection** | ua-parser-js | In-memory device & browser classification |
-| **Testing** | Vitest 5 & Vite 8 | 69 unit & integration tests with in-process Prisma mocking |
-| **Hosting** | Vercel | Production deployment with edge compatibility |
-
----
-
-## 5. System Architecture
-
+### Screenshot Placeholder
 ```
-                                  ┌────────────────────────┐
-                                  │      Client Browser    │
-                                  └───────────┬────────────┘
-                                              │ HTTP / HTTPS
-                                              ▼
-                                  ┌────────────────────────┐
-                                  │   Next.js App Router   │
-                                  │   (Edge Proxy & SSR)   │
-                                  └─────┬────────────┬─────┘
-                                        │            │
-                  Public Redirects /[code]           │ Authenticated Routes (/dashboard, /links/*)
-                                        │            │
-                                        ▼            ▼
-                           ┌───────────────────────────────┐
-                           │   Service Layer (Business)   │
-                           │ ───────────────────────────── │
-                           │  • links.service.ts           │
-                           │  • redirect.service.ts        │
-                           │  • analytics.service.ts       │
-                           │  • link-management.service.ts │
-                           └───────┬───────────────┬───────┘
-                                   │               │
-            Prisma ORM (Connection Pool)          Distributed Sliding Window
-                                   │               │
-                                   ▼               ▼
-                      ┌──────────────────────┐  ┌──────────────────────┐
-                      │   Neon PostgreSQL    │  │     Upstash Redis    │
-                      │  (User, Link, Click) │  │    (Rate Limiting)   │
-                      └──────────────────────┘  └──────────────────────┘
+┌────────────────────────────────────────────────────────────────────────┐
+│                                                                        │
+│                    [ LinkPulse Dashboard Preview ]                     │
+│                                                                        │
+│   [ Total Links: 10 ]     [ Total Clicks: 500 ]     [ Active: 6 ]      │
+│                                                                        │
+│   ┌────────────────────────────────────────────────────────────────┐   │
+│   │  /docs-guide  →  https://nextjs.org/docs           [85 Clicks] │   │
+│   │  /design-sys  →  https://figma.com                 [90 Clicks] │   │
+│   └────────────────────────────────────────────────────────────────┘   │
+│                                                                        │
+└────────────────────────────────────────────────────────────────────────┘
 ```
 
 ---
 
-## 6. Project Directory Structure
+## 2. Features
 
-```
-linkpulse/
-├── prisma/
-│   ├── migrations/             # Versioned SQL migrations
-│   ├── schema.prisma           # Prisma data models and indexes
-│   └── seed.ts                 # Idempotent development seed script
-├── src/
-│   ├── app/
-│   │   ├── (auth)/
-│   │   │   ├── login/          # Login page route
-│   │   │   └── register/       # User registration page route
-│   │   ├── [shortCode]/        # Public high-performance redirect route
-│   │   ├── api/
-│   │   │   ├── auth/           # NextAuth handlers & registration API
-│   │   │   └── links/          # Link CRUD, pagination, and analytics API
-│   │   ├── dashboard/          # Authenticated user dashboard
-│   │   ├── links/
-│   │   │   └── [id]/           # Dedicated link analytics page
-│   │   │       └── edit/       # Dedicated link edit page
-│   │   ├── layout.tsx          # Root layout & design system provider
-│   │   └── page.tsx            # Public marketing landing page
-│   ├── components/             # Reusable UI components
-│   │   ├── copy-button.tsx     # Clipboard copy button with visual feedback
-│   │   ├── create-link-form.tsx# Short link generator form
-│   │   ├── edit-link-page-form.tsx # Full edit form with alias warnings
-│   │   ├── my-links-section.tsx# Link cards, stats bar, quick modal
-│   │   └── providers.tsx       # Session provider wrapper
-│   ├── lib/                    # Shared infrastructure utilities
-│   │   ├── auth.config.ts      # Route protection and JWT callbacks
-│   │   ├── auth.ts             # Credentials provider & password verification
-│   │   ├── base-url.ts         # Environment-aware domain resolver
-│   │   ├── nanoid.ts           # Slug generator
-│   │   ├── prisma.ts           # Prisma client singleton
-│   │   ├── ratelimit.ts        # Upstash Redis & fallback rate limiter
-│   │   ├── reserved-words.ts   # System route collision blocklist
-│   │   └── ua-parser.ts        # Client device & browser analyzer
-│   ├── services/               # Pure business logic layer
-│   │   ├── analytics.service.ts
-│   │   ├── link-management.service.ts
-│   │   ├── links.service.ts
-│   │   └── redirect.service.ts
-│   ├── styles/
-│   │   └── globals.css         # Pure CSS custom properties & design tokens
-│   └── validators/             # Zod validation schemas
-│       ├── auth.validators.ts
-│       └── link.validators.ts
-├── tests/
-│   ├── phase4-5.test.ts        # Redirection, ownership, & click tracking tests
-│   └── phase6-7-8.test.ts      # 50 comprehensive tests across Categories A–H
-├── .env.example                # Documented environment variable template
-├── next.config.ts              # Security headers & Next.js configuration
-├── package.json
-├── tsconfig.json
-└── vitest.config.mts           # Vitest configuration
-```
+- [x] **High-Speed Redirection (`/[shortCode]`):** Optimized route resolution that redirects visitors immediately while logging analytics asynchronously in the background.
+- [x] **Custom Aliases:** Claim memorable slugs (e.g., `/summer-launch`, `/docs-guide`) with case-insensitive uniqueness checks.
+- [x] **Automatic Short-Code Generation:** Generates collision-resistant 7-character nanoid identifiers when no alias is specified.
+- [x] **Reserved-Word Protection:** Blocks over 30 critical system slugs (`/dashboard`, `/api`, `/login`, `/admin`, etc.) to prevent routing collisions.
+- [x] **Link Expiration:** Optional future expiration dates. Visitors to expired links see an informative, user-friendly expiration screen.
+- [x] **Link Activation / Deactivation:** Instantly toggle links active or inactive without deleting historical analytics data.
+- [x] **Destination URL Editing:** Modify the target destination URL of existing links with real-time protocol validation (`http://` / `https://`).
+- [x] **Click Telemetry:** Records timestamp, HTTP referrer, client device (mobile, desktop, tablet), and browser family (Chrome, Safari, Firefox, Edge).
+- [x] **Interactive Analytics Dashboard:** Real-time metrics visualization with 14-day click trend bars, top referrer rankings (with safe Direct visit fallback), and device/browser breakdowns.
+- [x] **User Authentication & Authorization:** Multi-tenant credential authentication with Auth.js (NextAuth v5), secure session cookies, and password visibility toggle.
+- [x] **User-Specific Link Isolation:** Strict server-side ownership enforcement — users can only view, edit, or delete their own links.
+- [x] **Distributed Sliding-Window Rate Limiting:** Enforces 10 link creations per user per hour via Upstash Redis with HTTP 429 and `Retry-After` headers.
+- [x] **Responsive UI & Design System:** Lightweight, pure CSS custom property design system tailored for mobile, tablet, and desktop viewports.
+- [x] **Pagination Support:** `GET /api/links?page=1&limit=20` with backward-compatible array fallback.
+- [x] **Idempotent Database Seeding:** Ready-to-use development and demo seed script preloaded with 2 demo users, 10 links, and 500 realistic click events.
 
 ---
 
-## 7. Database Models & Schema
+## 3. Demo Credentials
 
-The PostgreSQL schema is managed via Prisma with relations and database indexes:
+The database is pre-seeded with two demo accounts to test user isolation, link ownership, and analytics:
 
-```prisma
-model User {
-  id           String   @id @default(cuid())
-  email        String   @unique
-  passwordHash String
-  name         String?
-  createdAt    DateTime @default(now())
-  updatedAt    DateTime @updatedAt
+| Account | Email | Password | Role / Purpose |
+| :--- | :--- | :--- | :--- |
+| **Demo User** | `demo@linkpulse.io` | `Demo1234!` | Primary account: 5 seeded links (active, expired, disabled), ~250 clicks |
+| **Jane Doe** | `jane@linkpulse.io` | `Demo1234!` | Secondary account: 5 seeded links (active, expired, disabled), ~250 clicks |
 
-  links Link[]
-}
-
-model Link {
-  id          String    @id @default(cuid())
-  shortCode   String    @unique
-  originalUrl String
-  userId      String
-  title       String?
-  isActive    Boolean   @default(true)
-  expiresAt   DateTime?
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
-
-  user   User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  clicks Click[]
-
-  @@index([shortCode])
-  @@index([userId])
-  @@index([expiresAt])
-}
-
-model Click {
-  id         String   @id @default(cuid())
-  linkId     String
-  timestamp  DateTime @default(now())
-  referrer   String?
-  deviceType String?
-  browser    String?
-  ipHash     String?
-  country    String?
-
-  link Link @relation(fields: [linkId], references: [id], onDelete: Cascade)
-
-  @@index([linkId])
-  @@index([linkId, timestamp])
-  @@index([timestamp])
-}
-```
-
-- **Indexes**: Fast `O(log n)` lookups on `shortCode` for sub-millisecond redirects; composite indexes on `[linkId, timestamp]` for performant analytics queries.
-- **Referential Integrity**: Cascading deletes ensure deleting a link cleans up all click telemetry, and deleting a user removes all their links.
+*To test multi-tenant security: Log into `demo@linkpulse.io`, inspect the links, then switch to `jane@linkpulse.io` to verify that each user's links and analytics remain isolated.*
 
 ---
 
-## 8. Authentication & Authorization
-
-- **Library:** Auth.js (NextAuth v5 beta) with JWT session strategy (30-day expiration).
-- **Password Security:** Salted hashes generated via `bcryptjs` with cost factor 10. `passwordHash` is excluded from all select queries and API responses.
-- **Route Protection:** Handled via Next.js middleware and `authConfig.callbacks.authorized`. Any unauthenticated request to `/dashboard` or `/links/*` is redirected to `/login?callbackUrl=...`.
-- **Server-Side Authorization:** Every mutation (`updateLink`, `deleteLink`, `getLinkById`, `getLinkAnalytics`) derives the authenticated user ID strictly from the verified session, rejecting access if the requesting user does not own the link.
-
----
-
-## 9. Link Creation & Redirection Workflow
-
-1. **Creation:**
-   - Client sends `POST /api/links` with `url`, optional `alias`, `title`, and `expiresAt`.
-   - Zod validates that the destination starts strictly with `http://` or `https://` (preventing `javascript:`, `data:`, or `ftp:` vectors).
-   - If `alias` is supplied: validates format (`^[a-zA-Z0-9_-]+$`, 3–50 chars), checks reserved words, and ensures case-insensitive uniqueness in the database.
-   - If `alias` is omitted: generates a collision-resistant 7-character nanoid code.
-   - Rate limit check is evaluated (10 links/hr per user).
-2. **Redirection (`GET /[shortCode]`):**
-   - The shortCode is extracted and checked against reserved routes first (skips DB if reserved).
-   - Looks up the link by `shortCode`.
-   - If not found: renders standard 404 page.
-   - If `isActive === false`: displays friendly "Link Disabled" state.
-   - If `expiresAt <= now`: displays friendly "Link Expired" state.
-   - If valid: asynchronously logs click event (fire-and-forget, non-blocking) and issues an immediate HTTP redirect to `originalUrl`.
-
----
-
-## 10. Rate Limiting Mechanism
-
-- **Algorithm:** Distributed Sliding Window (10 creations per 1 hour window).
-- **Storage:** Upstash Redis REST API (`@upstash/ratelimit`).
-- **Identifier:** `link_create:${session.user.id}`.
-- **Response Headers:** When rate limited, LinkPulse responds with `429 Too Many Requests` including standard headers:
-  - `Retry-After: <seconds>`
-  - `X-RateLimit-Limit: 10`
-  - `X-RateLimit-Remaining: 0`
-  - `X-RateLimit-Reset: <timestamp>`
-- **Production Safety:** In production, if Upstash credentials are not configured, the system logs a server-side configuration error and enforces safe rejection rather than silently weakening rate limits. In development, a local in-memory sliding window limiter is provided as a seamless fallback.
-
----
-
-## 11. Analytics & Telemetry Engine
-
-- **Click Capture:** Captures `timestamp`, `referrer` (via request headers), `deviceType` (mobile, tablet, desktop via user-agent parsing), and `browser` (Chrome, Safari, Firefox, Edge, etc.).
-- **Privacy First:** Raw IP addresses are **never** stored in the database.
-- **Aggregation:**
-  - **Click Trend:** Grouped by date (`YYYY-MM-DD`) for the past 14 days.
-  - **Referrers:** Hostname extracted and ranked descending. Missing referrers are labeled safely as `"Direct"`.
-  - **Breakdowns:** Aggregated counts for device types and browsers.
-- **Fault-Tolerant:** Analytics logging errors are swallowed gracefully so user redirection is never delayed or interrupted.
-
----
-
-## 12. Local Installation & Setup
+## 4. Quick Start
 
 ### Prerequisites
-- **Node.js:** v18.17+ or v20+ (v24 supported)
-- **Package Manager:** npm v9+
-- **Database:** PostgreSQL database (recommended: [Neon free tier](https://neon.tech))
-- **Redis:** Upstash Redis database (free tier: [Upstash](https://console.upstash.com))
+- **Node.js:** v18.17+, v20+, or v24+
+- **npm:** v9+
+- **PostgreSQL:** Neon PostgreSQL database (free tier)
+- **Redis:** Upstash Redis database (free tier)
 
 ### 1. Clone the Repository
 ```bash
@@ -293,160 +96,290 @@ cd linkpulse
 ```bash
 npm install
 ```
+*(Automatically triggers `postinstall: prisma generate` to build Prisma Client)*
 
 ### 3. Configure Environment Variables
 ```bash
 cp .env.example .env.local
 ```
-Edit `.env.local` with your configuration:
-```env
-DATABASE_URL="postgresql://neondb_owner:PASSWORD@ep-xyz-pooler.region.neon.tech/neondb?sslmode=require"
-AUTH_SECRET="your-32-byte-base64-secret"
-NEXTAUTH_URL="http://localhost:3000"
-NEXT_PUBLIC_APP_URL="http://localhost:3000"
-UPSTASH_REDIS_REST_URL="https://your-upstash-redis.upstash.io"
-UPSTASH_REDIS_REST_TOKEN="your-upstash-token"
-```
-*(Generate an Auth secret with `openssl rand -base64 32`)*
+Fill in `.env.local` with your database and authentication secrets (see table below).
 
----
-
-## 13. Database Migrations & Seeding
-
-### 1. Validate Schema & Generate Client
-```bash
-npx prisma validate
-npx prisma generate
-```
-
-### 2. Apply Migrations
+### 4. Apply Database Migrations
 ```bash
 npx prisma migrate dev
-# Or check status against live DB:
+# Or verify current migration status:
 npx prisma migrate status
 ```
 
-### 3. Seed Demo Data
+### 5. Seed Demo Data
 ```bash
 npm run db:seed
 # Or directly:
 npx prisma db seed
 ```
+*(Populates 2 demo accounts, 10 links, and 500 click events idempotently)*
 
-This populates the database with:
-- Demo User: `demo@linkpulse.io` / `DemoPassword123!`
-- 4 sample short links (`/docs-guide`, `/summer-launch`, `/old-portfolio`, `/flash-sale`)
-- Sample click telemetry across devices, browsers, and referrers.
-- **Note:** The seed script is completely idempotent; re-running it will not duplicate links or click counts.
+### 6. Start the Development Server
+```bash
+npm run dev
+```
+Open [http://localhost:3000](http://localhost:3000) in your browser.
 
 ---
 
-## 14. Development & Testing Commands
+## 5. Environment Variables
 
-```bash
-# Start local development server
-npm run dev
+Create `.env.local` in the project root. All required variables are documented in [`.env.example`](.env.example):
 
-# Run automated test suite (69 tests)
-npm test
+| Variable | Scope | Description | Safe Example Placeholder |
+| :--- | :--- | :--- | :--- |
+| `DATABASE_URL` | Server | Pooled Neon PostgreSQL connection string (`sslmode=require&connect_timeout=30`) | `postgresql://user:pass@ep-xyz-pooler.region.neon.tech/neondb?sslmode=require&connect_timeout=30` |
+| `AUTH_SECRET` | Server | Auth.js JWT session encryption key (32-character base64 string) | Generate with `openssl rand -base64 32` |
+| `NEXTAUTH_URL` | Server | Canonical base URL of the application for callback validation | `http://localhost:3000` (Local) / `https://linkpulse.vercel.app` (Prod) |
+| `NEXT_PUBLIC_APP_URL` | Client/Server | Public base URL used when constructing short link URLs | `http://localhost:3000` (Local) / `https://linkpulse.vercel.app` (Prod) |
+| `UPSTASH_REDIS_REST_URL`| Server | Upstash Redis REST endpoint for distributed rate limiting | `https://your-upstash-instance.upstash.io` |
+| `UPSTASH_REDIS_REST_TOKEN`| Server| Upstash Redis REST API authentication bearer token | `your_secret_upstash_rest_token` |
 
-# Run tests in watch mode
-npm run test:watch
+> 🔒 *Security Note: Never commit `.env`, `.env.local`, or any actual secret values to version control. Both files are strictly ignored by `.gitignore`.*
 
-# TypeScript type checking
-npx tsc --noEmit
+---
 
-# ESLint code style and best practice check
-npm run lint
+## 6. System Architecture
 
-# Production build check
-npm run build
+The following Mermaid diagram details the end-to-end request flow, authentication boundaries, and data persistence:
 
-# Start production server locally
-npm run start
+```mermaid
+flowchart TD
+    User["👤 Visitor / User Browser"]
+    
+    subgraph Edge ["🌐 Vercel Edge / Network Layer"]
+        Proxy["Next.js Proxy / Middleware<br/>(Route Protection & Auth Guard)"]
+        Headers["Security Headers<br/>(X-Frame-Options, nosniff, Referrer-Policy)"]
+    end
+    
+    subgraph App ["⚡ Next.js App Router (Server-Side)"]
+        Landing["Landing Page (/)"]
+        AuthPages["Auth Pages (/login, /register)"]
+        Dashboard["Dashboard & Analytics (/dashboard, /links/*)"]
+        PublicRedirect["Public Redirect Route (/[shortCode])"]
+        
+        subgraph Services ["💼 Business Logic Service Layer"]
+            LinkService["links.service.ts"]
+            MgmtService["link-management.service.ts"]
+            RedirectService["redirect.service.ts"]
+            AnalyticsService["analytics.service.ts"]
+        end
+    end
+    
+    subgraph External ["☁️ Cloud Infrastructure"]
+        AuthModule["🔐 Auth.js (NextAuth v5)<br/>JWT Sessions & bcryptjs"]
+        Upstash["🚦 Upstash Redis<br/>(Sliding-Window Rate Limiting)"]
+        NeonDB["🐘 Neon PostgreSQL<br/>(Prisma Connection Pool)"]
+    end
+
+    User --> Headers --> Proxy
+    Proxy -->|Public| Landing
+    Proxy -->|Auth| AuthPages
+    Proxy -->|Protected| Dashboard
+    Proxy -->|Short URL| PublicRedirect
+
+    PublicRedirect --> RedirectService
+    RedirectService --> NeonDB
+    PublicRedirect -.->|Async Non-Blocking| AnalyticsService
+    AnalyticsService -.-> NeonDB
+
+    Dashboard --> MgmtService
+    Dashboard --> LinkService
+    LinkService --> Upstash
+    LinkService --> NeonDB
+    MgmtService --> NeonDB
+    AuthPages --> AuthModule
+    AuthModule --> NeonDB
 ```
 
 ---
 
-## 15. Automated Test Suite (69 Tests)
+## 7. Data Model
 
-LinkPulse features comprehensive test coverage across 2 test suites:
-- `tests/phase4-5.test.ts` (19 tests): Destination editing, click logging, ownership restrictions, and redirect verification.
-- `tests/phase6-7-8.test.ts` (50 tests):
-  - **Category A (1–11):** Link creation, validation, dangerous schemes (`javascript:`, `data:`, `ftp:`), duplicate aliases, past/future expiry, and rate limits.
-  - **Category B (12–15):** Authentication enforcement, credential resolution, and protected route callbacks.
-  - **Category C (16–20):** Active redirects, 404 responses, expired/inactive link blocking, and reserved slug routing.
-  - **Category D (21–26):** Click telemetry, timestamps, referrers, UA device/browser detection, and non-blocking failure tolerance.
-  - **Category E (27–31):** Multi-tenant ownership isolation, cross-user mutation prevention, and server-side session binding.
-  - **Category F (32–37):** Link editing (URL, title, expiry, alias with self-exclusion, active status) and deletion.
-  - **Category G (38–44):** Analytics metric accuracy, date grouping, last-click tracking, breakdowns, and Direct referrer fallback.
-  - **Category H (45–50):** Edge cases, payload validation, XSS escaping, concurrent clicks, empty states, and pagination math.
+LinkPulse uses a normalized PostgreSQL database managed through Prisma:
+
+```mermaid
+erDiagram
+    USER ||--o{ LINK : "owns"
+    LINK ||--o{ CLICK : "tracks"
+
+    USER {
+        string id PK "cuid"
+        string email UK "unique, normalized lowercase"
+        string passwordHash "salted bcrypt hash"
+        string name "optional display name"
+        datetime createdAt "default now"
+        datetime updatedAt "auto-updated"
+    }
+
+    LINK {
+        string id PK "cuid"
+        string shortCode UK "unique 7-char code or custom alias"
+        string originalUrl "validated http/https destination"
+        string userId FK "references USER(id), cascade delete"
+        string title "optional link label"
+        boolean isActive "default true"
+        datetime expiresAt "optional expiration date"
+        datetime createdAt "default now"
+        datetime updatedAt "auto-updated"
+    }
+
+    CLICK {
+        string id PK "cuid"
+        string linkId FK "references LINK(id), cascade delete"
+        datetime timestamp "default now"
+        string referrer "extracted hostname or full URL"
+        string deviceType "mobile | desktop | tablet"
+        string browser "Chrome | Safari | Firefox | Edge"
+        string ipHash "optional non-PII hash"
+        string country "optional country code"
+    }
+```
+
+### Key Schema Characteristics
+- **Fast Lookups:** B-Tree index on `Link.shortCode` guarantees sub-millisecond redirect resolution.
+- **Composite Analytics Indexing:** Composite index `@@index([linkId, timestamp])` allows performant date-range queries without full-table scans.
+- **Cascade Deletion:** Deleting a user automatically purges all their links, and deleting a link removes all associated click telemetry.
 
 ---
 
-## 16. Vercel Deployment Instructions
+## 8. API Reference
 
-1. **Push to GitHub** (ensure `.env.local` is never committed; verify `.gitignore`).
-2. **Import Project into Vercel:**
-   - Framework Preset: **Next.js**
-   - Root Directory: `./`
-3. **Configure Environment Variables in Vercel Project Settings:**
-   - `DATABASE_URL`: Your pooled Neon connection string (`sslmode=require`).
-   - `AUTH_SECRET`: Strong 32-character base64 secret (`openssl rand -base64 32`).
-   - `NEXTAUTH_URL`: Your production custom domain (e.g. `https://linkpulse.vercel.app`).
-   - `NEXT_PUBLIC_APP_URL`: Same as `NEXTAUTH_URL`.
-   - `UPSTASH_REDIS_REST_URL`: Upstash REST URL.
-   - `UPSTASH_REDIS_REST_TOKEN`: Upstash REST Token.
-4. **Build & Output Settings:**
-   - Build Command: `next build`
-   - Install Command: `npm install` (runs `postinstall: prisma generate` automatically).
-5. **Deploy:** Click **Deploy**. Vercel will build the application, generate Prisma Client, and deploy serverless functions.
+All API routes strictly follow REST standards, return standard JSON responses, and enforce server-side validation:
+
+| Method | Endpoint | Auth Required | Description | Status Codes |
+| :--- | :--- | :---: | :--- | :--- |
+| `POST` | `/api/auth/register` | No | Registers a new user account with hashed password | `201`, `400`, `409`, `503` |
+| `GET` | `/api/auth/[...nextauth]` | No | Auth.js session handling, CSRF token, and provider endpoints | `200` |
+| `POST` | `/api/auth/[...nextauth]` | No | Processes credentials login and sign-out requests | `200`, `401` |
+| `GET` | `/api/links` | **Yes** | Lists links owned by the authenticated user. Supports `?page=1&limit=20` pagination | `200`, `401`, `500` |
+| `POST` | `/api/links` | **Yes** | Creates a new short link with optional alias, title, and expiration. Rate-limited to 10/hr | `201`, `400`, `401`, `409`, `429` |
+| `GET` | `/api/links/[id]` | **Yes** | Fetches full link details for the verified owner | `200`, `401`, `403`, `404` |
+| `PATCH`| `/api/links/[id]` | **Yes** | Updates destination URL, custom alias, title, expiry, or active state (owner only) | `200`, `400`, `401`, `403`, `404`, `409` |
+| `DELETE`| `/api/links/[id]`| **Yes** | Deletes a link and cascades to its click records (owner only) | `204`, `401`, `403`, `404` |
+| `GET` | `/api/links/[id]/analytics` | **Yes** | Retrieves aggregated click trends, referrers, devices, and browser metrics (owner only) | `200`, `401`, `403`, `404` |
+| `GET` | `/[shortCode]` | No | Public redirection handler. Records telemetry asynchronously and redirects to destination | `307`, `404` (Inactive/Expired UI) |
 
 ---
 
-## 17. Completed Features Checklist
+## 9. Design Decisions
 
-- [x] Responsive Marketing Landing Page (`/`) with branding, features, and how-it-works
-- [x] Secure Registration (`/register`) and Login (`/login`)
-- [x] Authenticated Dashboard (`/dashboard`) with link creation and 3-column summary stats bar
-- [x] Loading skeleton states and empty state views
-- [x] Public High-Speed Redirection (`/[shortCode]`) with custom 404, Expired, and Inactive pages
-- [x] Dedicated Full Analytics Page (`/links/[id]`) with 14-day trend charts, referrers, and device/browser stats
-- [x] Dedicated Edit Page (`/links/[id]/edit`) and quick-edit modal with alias modification warnings
+1. **Next.js 16 App Router:** Single full-stack architecture eliminating cross-origin CORS overhead. Combines static marketing pages with server-rendered dynamic routes and secure API route handlers.
+2. **Neon Serverless PostgreSQL & Prisma:** Neon provides auto-scaling PostgreSQL with built-in connection pooling. Prisma delivers strict TypeScript schema types, automated migration tracking, and protection against SQL injection.
+3. **Auth.js (NextAuth v5):** Implements JWT stateless sessions (30-day lifecycle) with `httpOnly`, `sameSite`, and `secure` cookie configurations. Completely eliminates server-side session table lookups.
+4. **Collision-Resistant Short Codes (nanoid):** 7-character alphanumeric alphabet (`[a-zA-Z0-9]`) yields over $62^7 \approx 3.5 \times 10^{12}$ combinations, maintaining sub-millisecond generation without database sequence locks.
+5. **Distributed Sliding-Window Rate Limiting:** Traditional fixed-window limiters suffer from boundary traffic doubling. The sliding-window algorithm on Upstash Redis tracks rolling timestamps, preventing burst link spamming across serverless instances.
+6. **Fire-and-Forget Telemetry Logging:** Public link redirection does not `await` click insertion. Redirect responses complete immediately, ensuring low latency even under heavy traffic.
+
+---
+
+## 10. Automated Testing
+
+LinkPulse maintains an automated test suite executed with Vitest:
+
+```bash
+# Run all automated tests once
+npm test
+
+# Run tests in watch mode
+npm run test:watch
+```
+
+### Verified Test Suite Breakdown (69 Tests Passing)
+- **`tests/phase4-5.test.ts` (19 Tests):** Destination URL editing, invalid scheme rejection, cross-user mutation blocks, click telemetry logging, referrer extraction, and deletion verification.
+- **`tests/phase6-7-8.test.ts` (50 Tests):**
+  - **Category A (Tests 1–11):** Link creation, invalid URL rejection, `javascript:`, `data:`, and `ftp:` blocking, alias regex enforcement, reserved-word collision blocking, duplicate alias conflicts, expiration date validation, and rate limit enforcement.
+  - **Category B (Tests 12–15):** Unauthenticated request blocking, credential lookup verification, invalid password rejection, and route protection callbacks.
+  - **Category C (Tests 16–20):** Active redirects, non-existent 404 responses, expired link blocking, disabled link blocking, and reserved word bypassing.
+  - **Category D (Tests 21–26):** Click event persistence, timestamp fidelity, referrer trimming, device parsing, browser classification, and non-blocking failure tolerance.
+  - **Category E (Tests 27–31):** Multi-tenant link isolation, unauthorized mutation prevention, unauthorized analytics protection, and session-derived `userId` verification.
+  - **Category F (Tests 32–37):** Destination URL updating, title updating, expiry updating, alias updating with self-exclusion, active status toggling, and link deletion.
+  - **Category G (Tests 38–44):** Total click accuracy, date grouping (`YYYY-MM-DD`), latest click resolution, device breakdown, browser breakdown, Direct referrer fallback, and ownership verification.
+  - **Category H (Tests 45–50):** Schema payload validation, XSS title string sanitization, concurrent click resilience, empty state handling, pagination math, and long query URL validation.
+
+---
+
+## 11. Completed Features
+
+- [x] Responsive Marketing Landing Page (`/`) with feature showcase and how-it-works section
+- [x] Secure Registration (`/register`) and Login (`/login`) with password visibility toggle
+- [x] Authenticated Dashboard (`/dashboard`) with 3-column summary statistics bar (Total Links, Total Clicks, Active Links)
+- [x] Loading skeleton cards and empty state UI
+- [x] Public High-Speed Redirection (`/[shortCode]`) with custom 404, Expired, and Disabled screens
+- [x] Dedicated Full Analytics Page (`/links/[id]`) with 14-day trend charts, referrers, devices, and browsers
+- [x] Dedicated Link Edit Page (`/links/[id]/edit`) and modal with alias change warnings
 - [x] Destination URL editing with real-time protocol validation
-- [x] Case-insensitive alias uniqueness check excluding current link ID
-- [x] Reserved route blocklist protection
-- [x] Distributed rate limiting via Upstash Redis (10 links/hour per user)
-- [x] PII-free click tracking and referrer normalization
+- [x] Custom alias support with case-insensitive uniqueness check (excluding self)
+- [x] Reserved route blocklist protection (30+ system routes blocked)
+- [x] Distributed sliding-window rate limiting via Upstash Redis (10 links/hour per user)
+- [x] PII-free click tracking and referrer hostname normalization
 - [x] Pagination support on `GET /api/links` (`?page=1&limit=20`)
-- [x] Idempotent database seed script (`npm run db:seed`)
+- [x] Database cold-start auto-retry for seamless Neon wake-ups
+- [x] Idempotent database seed script (`npm run db:seed`) creating 2 users, 10 links, and 500 clicks
 - [x] 69/69 Automated Tests Passing
 
 ---
 
-## 18. Known Limitations
+## 12. Unfinished Features
 
-- **Rate Limit Window:** Link creation rate limiting is currently configured on an hourly sliding window. Burst-limiting over short intervals (e.g., 5 links/minute) can be added as traffic scales.
-- **Referrer Privacy Policies:** Modern browsers stripping referrers via `strict-origin-when-cross-origin` will cause those clicks to be reported under the `"Direct"` category.
-
----
-
-## 19. Future Improvements
-
-- **Custom Domain Support:** Allow pro users to connect custom domains for their short links (e.g., `go.brand.com`).
-- **QR Code Generation:** Add downloadable vector SVG/PNG QR codes for short links directly on the analytics page.
-- **UTM Tag Builder:** Built-in UTM campaign parameter builder inside the link creation form.
-- **Export Analytics:** CSV/JSON report downloads for link click telemetry.
-- **Webhook Alerts:** Webhook notifications when a link exceeds click milestones or reaches its expiration date.
+- **UTM Tag Builder:** Campaign parameter builder in the create link modal is not yet automated.
+- **QR Code Vector Download:** Short link QR code download on the details page is currently planned for a future release.
 
 ---
 
-## 20. AI Tools & Attribution
+## 13. Future Improvements
 
-This project was developed with architectural planning, code verification, and testing assistance from **Google Antigravity (Gemini)**. All code and test suites have been inspected, reviewed, and verified by the author.
+1. **Custom Domain Support:** Allow users to connect custom branded domains (e.g. `go.yourbrand.com`) using Cloudflare or Vercel domain verification.
+2. **QR Code Generator:** Generate downloadable SVG/PNG QR codes for every created short link.
+3. **CSV/PDF Analytics Export:** One-click data exports for link click history and metrics.
+4. **Unique Visitor Telemetry:** Non-PII daily unique visitor estimates using cryptographic HyperLogLog counters in Redis.
+5. **Webhook Alerts:** Webhook notifications when a link crosses engagement milestones (e.g., 1,000 clicks) or approaches expiration.
 
 ---
 
-## 21. License
+## 14. AI Tools Used
 
-This project is licensed under the **MIT License**.
+This project was developed with architectural design, code verification, and automated testing assistance from **Google Antigravity (Gemini)**. All architectural decisions, source code, database migrations, and test suites were reviewed, validated, and tested by the engineer.
+
+---
+
+## 15. License & Terms
+
+All rights reserved. This repository and its contents are part of a technical engineering evaluation and internship assignment. Unauthorized commercial distribution or redistribution without permission is prohibited.
+
+---
+
+## 16. Production Deployment Preparation (Vercel + Neon)
+
+### Hosting Architecture
+- **Web Application & API:** [Vercel](https://vercel.com) (Next.js App Router)
+- **PostgreSQL Database:** [Neon](https://neon.tech) (Serverless PostgreSQL with connection pooling)
+- **Distributed Cache & Rate Limiting:** [Upstash Redis](https://upstash.com)
+- **Version Control:** GitHub
+
+### Production Migration Strategy
+When deploying to production, **never** run `prisma migrate reset` or `prisma db push`. Always apply versioned migrations safely:
+```bash
+# Apply pending versioned migrations in production
+npx prisma migrate deploy
+```
+On Vercel, `"postinstall": "prisma generate"` in `package.json` guarantees that the Prisma Client is automatically regenerated during every deployment build.
+
+### Production Seeding Procedure (One-Time / Optional)
+To seed the demonstration accounts and initial links on a production or staging Neon database, run:
+```bash
+# Execute idempotent seed against target database
+npx prisma db seed
+```
+*(The script uses upsert logic and count checks; running it multiple times will not duplicate accounts or click counts)*
+
+### Custom Domain Configuration (Vercel)
+1. Go to your Vercel Project Dashboard → **Settings** → **Domains**.
+2. Enter your custom domain (e.g., `linkpulse.yourdomain.com`).
+3. Add the recommended `CNAME` or `A` DNS records at your domain registrar.
+4. Update `NEXTAUTH_URL` and `NEXT_PUBLIC_APP_URL` in Vercel Environment Variables to reflect your new custom domain.
