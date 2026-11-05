@@ -23,9 +23,24 @@ export const { handlers, auth, signIn, signOut } = NextAuth({
 
         const normalizedEmail = parsed.data.email.toLowerCase().trim();
 
-        const user = await prisma.user.findUnique({
-          where: { email: normalizedEmail },
-        });
+        let user = null;
+        try {
+          user = await prisma.user.findUnique({
+            where: { email: normalizedEmail },
+          });
+        } catch {
+          // If connection error / cold start, retry once after 1.5s
+          console.warn("[Auth Login] Database cold start or connection issue, retrying lookup...");
+          await new Promise((res) => setTimeout(res, 1500));
+          try {
+            user = await prisma.user.findUnique({
+              where: { email: normalizedEmail },
+            });
+          } catch (retryErr) {
+            console.error("[Auth Login] Database lookup failed after retry:", retryErr);
+            return null;
+          }
+        }
 
         if (!user || !user.passwordHash) {
           // Prevent email enumeration by returning generic null
