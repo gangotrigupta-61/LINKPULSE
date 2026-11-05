@@ -125,6 +125,7 @@ async function main() {
       where: { email: demoUser.email },
       update: {
         name: demoUser.name,
+        passwordHash,
       },
       create: {
         email: demoUser.email,
