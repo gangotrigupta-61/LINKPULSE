@@ -94,11 +94,20 @@ export async function checkLinkCreateRateLimit(
         reset: res.reset,
       };
     } catch (err) {
-      // Safe fallback on Redis failure: do not crash request, log server-side error
+      // In production, Redis failures must fail-closed to prevent unlimited link creation
       console.error(
-        "[RateLimit] Upstash Redis request failed, falling back to local sliding window:",
+        "[RateLimit] Upstash Redis request failed:",
         err
       );
+      if (process.env.NODE_ENV === "production") {
+        return {
+          success: false,
+          limit: 10,
+          remaining: 0,
+          reset: Date.now() + 60 * 1000,
+        };
+      }
+      // Safe fallback on Redis failure in development / preview
       return memoryLimiter.limit(identifier);
     }
   }
