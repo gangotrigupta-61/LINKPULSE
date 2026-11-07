@@ -42,6 +42,17 @@ interface AnalyticsData {
   referrers?: ReferrerData[];
 }
 
+// Helper to ensure short URLs match the current browser origin in client components
+function formatLinkItem(item: LinkItem): LinkItem {
+  if (typeof window !== "undefined" && window.location?.origin && item.shortCode) {
+    return {
+      ...item,
+      shortUrl: `${window.location.origin}/${item.shortCode}`,
+    };
+  }
+  return item;
+}
+
 // ─── Tiny inline bar chart (no external deps) ────────────────────────────────
 function MiniBarChart({ data }: { data: ClickHistory[] }) {
   if (data.length === 0) return <p style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>No click data yet.</p>;
@@ -324,7 +335,11 @@ function AnalyticsModal({
         if (json.error) {
           setError(json.error);
         } else {
-          setData(json as AnalyticsData);
+          const analyticsObj = json as AnalyticsData;
+          if (typeof window !== "undefined" && window.location?.origin && json.shortCode) {
+            analyticsObj.shortUrl = `${window.location.origin}/${json.shortCode}`;
+          }
+          setData(analyticsObj);
         }
         setLoading(false);
       })
@@ -931,7 +946,7 @@ export function MyLinksSection() {
       if (!res.ok) {
         setError(json.error ?? "Failed to load links.");
       } else {
-        setLinks(json as LinkItem[]);
+        setLinks((json as LinkItem[]).map(formatLinkItem));
       }
     } catch {
       setError("Network error. Please try again.");
@@ -947,7 +962,7 @@ export function MyLinksSection() {
       .then((json) => {
         if (!ignore) {
           if (Array.isArray(json)) {
-            setLinks(json as LinkItem[]);
+            setLinks((json as LinkItem[]).map(formatLinkItem));
           } else {
             setError(json.error ?? "Failed to load links.");
           }
@@ -994,7 +1009,8 @@ export function MyLinksSection() {
   }
 
   function handleLinkSaved(updated: LinkItem) {
-    setLinks((prev) => prev.map((l) => (l.id === updated.id ? { ...l, ...updated } : l)));
+    const formatted = formatLinkItem(updated);
+    setLinks((prev) => prev.map((l) => (l.id === formatted.id ? { ...l, ...formatted } : l)));
   }
 
   // Aggregate summary statistics

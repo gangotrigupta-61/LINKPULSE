@@ -8,7 +8,25 @@ import { signIn } from "next-auth/react";
 function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const callbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+  const rawCallbackUrl = searchParams.get("callbackUrl") || "/dashboard";
+
+  // Sanitize callbackUrl to ensure internal relative navigation and prevent localhost redirects
+  const getSafeCallbackUrl = (raw: string): string => {
+    if (raw.startsWith("/") && !raw.startsWith("//")) {
+      return raw;
+    }
+    try {
+      const parsed = new URL(raw);
+      if (parsed.pathname.startsWith("/")) {
+        return parsed.pathname + parsed.search;
+      }
+    } catch {
+      // Fallback to dashboard
+    }
+    return "/dashboard";
+  };
+
+  const callbackUrl = getSafeCallbackUrl(rawCallbackUrl);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");

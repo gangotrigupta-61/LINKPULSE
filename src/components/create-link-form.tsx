@@ -95,7 +95,19 @@ export function CreateLinkForm() {
         return;
       }
 
-      setCreatedLink(data);
+      const currentOrigin =
+        typeof window !== "undefined" && window.location?.origin
+          ? window.location.origin
+          : "";
+      const safeShortUrl =
+        currentOrigin && data.shortCode
+          ? `${currentOrigin}/${data.shortCode}`
+          : data.shortUrl;
+
+      setCreatedLink({
+        ...data,
+        shortUrl: safeShortUrl,
+      });
       // Reset form on success
       setUrl("");
       setTitle("");

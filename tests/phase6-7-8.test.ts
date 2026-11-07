@@ -74,6 +74,7 @@ import { parseUserAgent } from "@/lib/ua-parser";
 import { isReservedWord } from "@/lib/reserved-words";
 import { checkLinkCreateRateLimit } from "@/lib/ratelimit";
 import { authConfig } from "@/lib/auth.config";
+import { getBaseUrl } from "@/lib/base-url";
 
 const mockLinkFindFirst = vi.mocked(prisma.link.findFirst);
 const mockLinkFindMany = vi.mocked(prisma.link.findMany);
@@ -256,6 +257,77 @@ describe("Category B: Authentication Tests", () => {
       expect(res).toBeInstanceOf(Response);
       const redirectLocation = (res as Response).headers.get("location");
       expect(redirectLocation).toContain("/login");
+    }
+  });
+
+  // Test 15b: trustHost is true and reverse proxy host is preserved
+  it("TEST 15b: Auth configuration enables trustHost and preserves reverse-proxy origin", () => {
+    expect(authConfig.trustHost).toBe(true);
+
+    const authorized = authConfig.callbacks?.authorized;
+    if (authorized) {
+      const forwardedReq = {
+        auth: null,
+        request: {
+          nextUrl: new URL("http://localhost:3000/dashboard"),
+          headers: new Headers({
+            "x-forwarded-host": "linkpulse-nine-nu.vercel.app",
+            "x-forwarded-proto": "https",
+          }),
+        },
+      } as never;
+      const res = authorized(forwardedReq) as Response;
+      expect(res.status).toBe(302);
+      expect(res.headers.get("location")).toBe(
+        "https://linkpulse-nine-nu.vercel.app/login?callbackUrl=%2Fdashboard"
+      );
+    }
+  });
+
+  // Test 15c: redirect callback prevents redirecting to localhost in production
+  it("TEST 15c: Redirect callback sanitizes localhost to relative path and preserves valid domains", async () => {
+    const redirect = authConfig.callbacks?.redirect;
+    expect(redirect).toBeDefined();
+
+    if (redirect) {
+      // Relative path remains relative
+      const rel = await redirect({ url: "/dashboard", baseUrl: "https://linkpulse-nine-nu.vercel.app" });
+      expect(rel).toBe("/dashboard");
+
+      // Localhost absolute URL is sanitized to relative path
+      const sanitized = await redirect({
+        url: "http://localhost:3000/dashboard?from=oauth",
+        baseUrl: "https://linkpulse-nine-nu.vercel.app",
+      });
+      expect(sanitized).toBe("/dashboard?from=oauth");
+
+      // Production deployment domain is preserved
+      const prod = await redirect({
+        url: "https://linkpulse-nine-nu.vercel.app/dashboard",
+        baseUrl: "https://linkpulse-nine-nu.vercel.app",
+      });
+      expect(prod).toBe("https://linkpulse-nine-nu.vercel.app/dashboard");
+    }
+  });
+
+  // Test 15d: getBaseUrl resolves production URLs without returning localhost
+  it("TEST 15d: getBaseUrl resolves Vercel production domain and ignores localhost in production", () => {
+    const originalEnv = { ...process.env };
+    try {
+      // Simulated Vercel deployment
+      process.env.VERCEL = "1";
+      process.env.VERCEL_URL = "linkpulse-nine-nu.vercel.app";
+      delete process.env.NEXT_PUBLIC_APP_URL;
+      delete process.env.NEXTAUTH_URL;
+      expect(getBaseUrl()).toBe("https://linkpulse-nine-nu.vercel.app");
+
+      // Simulated Vercel deployment where localhost was mistakenly set in env
+      process.env.NEXT_PUBLIC_APP_URL = "http://localhost:3000";
+      process.env.NEXTAUTH_URL = "http://localhost:3000";
+      (process.env as Record<string, string | undefined>).NODE_ENV = "production";
+      expect(getBaseUrl()).toBe("https://linkpulse-nine-nu.vercel.app");
+    } finally {
+      process.env = originalEnv;
     }
   });
 });

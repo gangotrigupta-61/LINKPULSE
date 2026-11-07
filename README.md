@@ -8,7 +8,7 @@
 
 ## Live Demo & Repository
 
-- **Live Application URL:** `[https://linkpulse.vercel.app]` *(Placeholder — configure after Vercel deployment)*
+- **Live Application URL:** https://linkpulse-nine-nu.vercel.app
 - **GitHub Repository:** `[https://github.com/your-username/linkpulse]` *(Placeholder)*
 - **Demo Accounts (Public Demonstration):**
   - **Account 1:** `demo@linkpulse.io` | Password: `Demo1234!`
