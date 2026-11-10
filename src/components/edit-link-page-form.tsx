@@ -26,7 +26,6 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
 
-  // Track if alias was modified
   const aliasChanged = alias.trim() !== initialLink.shortCode;
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -52,7 +51,9 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
     }
 
     if (trimmedAlias && !/^[a-zA-Z0-9_-]+$/.test(trimmedAlias)) {
-      setError("Alias can only contain letters, numbers, hyphens (-), and underscores (_).");
+      setError(
+        "Alias can only contain letters, numbers, hyphens (-), and underscores (_)."
+      );
       return;
     }
 
@@ -105,11 +106,10 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
 
       {success && (
         <div className="auth-alert-success" role="status">
-          Changes saved successfully! Redirecting to link details…
+          Changes saved successfully. Redirecting to link analytics...
         </div>
       )}
 
-      {/* Destination URL */}
       <div className="form-group">
         <label htmlFor="edit-url" className="form-label">
           Destination URL *
@@ -124,12 +124,11 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
           onChange={(e) => setDestinationUrl(e.target.value)}
           disabled={saving}
         />
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>
-          The URL that visitors will be redirected to. Must start with http:// or https://.
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-dim)" }}>
+          Visitors will be redirected to this http:// or https:// address.
         </span>
       </div>
 
-      {/* Title */}
       <div className="form-group">
         <label htmlFor="edit-title" className="form-label">
           Link Title (optional)
@@ -146,7 +145,6 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
         />
       </div>
 
-      {/* Custom Alias */}
       <div className="form-group">
         <label htmlFor="edit-alias" className="form-label">
           Short Code / Custom Alias
@@ -163,13 +161,19 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
         />
         {aliasChanged && (
           <div className="alias-warning" role="alert">
-            ⚠️ <strong>Warning:</strong> Changing the short code changes your public short URL.
-            Any previous links shared with <code>/{initialLink.shortCode}</code> will stop working.
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ flexShrink: 0, marginTop: "2px" }} aria-hidden="true">
+              <path d="M10.29 3.86L1.82 18a2 2 0 0 0 1.71 3h16.94a2 2 0 0 0 1.71-3L13.71 3.86a2 2 0 0 0-3.42 0z" />
+              <line x1="12" y1="9" x2="12" y2="13" />
+              <line x1="12" y1="17" x2="12.01" y2="17" />
+            </svg>
+            <span>
+              <strong>Warning:</strong> Changing the short code changes your public short URL.
+              Previous links shared with <code>/{initialLink.shortCode}</code> will stop working.
+            </span>
           </div>
         )}
       </div>
 
-      {/* Expiry Date */}
       <div className="form-group">
         <label htmlFor="edit-expires" className="form-label">
           Expiration Date (optional, clear to remove)
@@ -182,73 +186,50 @@ export function EditLinkPageForm({ initialLink }: EditLinkPageFormProps) {
           onChange={(e) => setExpiresAt(e.target.value)}
           disabled={saving}
         />
-        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>
-          After this timestamp, visitors will see an expired link page.
+        <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-dim)" }}>
+          After this timestamp, visitors will see an expired link notice.
         </span>
       </div>
 
-      {/* Active status */}
-      <div
-        className="form-group"
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          gap: "var(--space-3)",
-          padding: "var(--space-3)",
-          background: "var(--color-surface-2)",
-          borderRadius: "var(--radius-md)",
-          border: "1px solid var(--color-border)",
-        }}
-      >
+      <div className="toggle-checkbox-card">
         <input
           id="edit-active"
           type="checkbox"
           checked={isActive}
           onChange={(e) => setIsActive(e.target.checked)}
           disabled={saving}
-          style={{ width: "18px", height: "18px", accentColor: "var(--color-accent)" }}
+          style={{ width: "17px", height: "17px", marginTop: "2px", accentColor: "var(--color-accent)" }}
         />
-        <label htmlFor="edit-active" className="form-label" style={{ margin: 0, cursor: "pointer" }}>
-          Link is Active
-          <span
-            style={{
-              display: "block",
-              fontSize: "var(--text-xs)",
-              color: "var(--color-text-muted)",
-              fontWeight: "normal",
-            }}
-          >
-            Uncheck to disable redirection without deleting the link.
+        <label
+          htmlFor="edit-active"
+          style={{ cursor: "pointer", display: "flex", flexDirection: "column", gap: "2px" }}
+        >
+          <span style={{ fontSize: "var(--text-sm)", fontWeight: "var(--font-medium)", color: "var(--color-text)" }}>
+            Link is Active
+          </span>
+          <span style={{ fontSize: "var(--text-xs)", color: "var(--color-text-muted)" }}>
+            Uncheck to pause redirection without deleting the link or its analytics.
           </span>
         </label>
       </div>
 
-      {/* Action Buttons */}
-      <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-4)" }}>
+      <div style={{ display: "flex", gap: "var(--space-3)", marginTop: "var(--space-2)" }}>
         <Link
           href={`/links/${initialLink.id}`}
-          className="form-button"
-          style={{
-            flex: 1,
-            background: "transparent",
-            border: "1px solid var(--color-border)",
-            color: "var(--color-text)",
-            textDecoration: "none",
-            textAlign: "center",
-          }}
+          className="btn btn-secondary"
+          style={{ flex: 1 }}
         >
           Cancel
         </Link>
         <button
           type="submit"
-          className="form-button"
+          className="btn btn-primary"
           disabled={saving}
           style={{ flex: 2 }}
         >
-          {saving ? "Saving Changes…" : "Save Changes"}
+          {saving ? "Saving..." : "Save Changes"}
         </button>
       </div>
     </form>
   );
 }
-

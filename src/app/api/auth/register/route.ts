@@ -19,7 +19,11 @@ function isConnectionError(err: unknown): boolean {
     name === "PrismaClientInitializationError" ||
     message.includes("Can't reach database server") ||
     message.includes("timed out") ||
-    message.includes("Connection terminated")
+    message.includes("Connection terminated") ||
+    message.includes("SASL") ||
+    message.includes("channel binding") ||
+    message.includes("password authentication failed") ||
+    message.includes("authentication")
   );
 }
 
@@ -132,8 +136,17 @@ export async function POST(req: Request) {
       );
     }
 
+    // Log detailed error info for debugging (never expose to client)
+    if (process.env.NODE_ENV !== "production") {
+      console.error("[Register] Error detail:", {
+        name: (error as Record<string, unknown>)?.name,
+        code: (error as Record<string, unknown>)?.code,
+        message: (error as Record<string, unknown>)?.message,
+      });
+    }
+
     return NextResponse.json(
-      { error: "Internal server error occurred while registering user." },
+      { error: "Registration failed. Please try again later." },
       { status: 500 }
     );
   }

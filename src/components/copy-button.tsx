@@ -13,8 +13,8 @@ interface CopyButtonProps {
 export function CopyButton({
   text,
   label = "Copy URL",
-  copiedLabel = "✓ Copied!",
-  className = "form-button",
+  copiedLabel = "Copied",
+  className,
   style,
 }: CopyButtonProps) {
   const [copied, setCopied] = useState(false);
@@ -47,30 +47,34 @@ export function CopyButton({
     <button
       type="button"
       onClick={handleCopy}
-      className={className}
-      style={{
-        width: "auto",
-        padding: "var(--space-2) var(--space-4)",
-        fontSize: "var(--text-xs)",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        color: "var(--color-text)",
-        cursor: "pointer",
-        borderRadius: "var(--radius-md)",
-        display: "inline-flex",
-        alignItems: "center",
-        gap: "var(--space-2)",
-        transition: "all var(--transition-fast)",
-        ...style,
-      }}
+      className={
+        className ??
+        `btn btn-sm ${copied ? "action-btn--copied" : "btn-secondary"}`
+      }
+      style={style}
       title="Copy to clipboard"
     >
-      {copied ? (
-        <span style={{ color: "var(--color-success)" }}>{copiedLabel}</span>
-      ) : (
-        <span>{label}</span>
-      )}
+      <svg
+        width="13"
+        height="13"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="2"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        aria-hidden="true"
+      >
+        {copied ? (
+          <polyline points="20 6 9 17 4 12" />
+        ) : (
+          <>
+            <rect x="9" y="9" width="13" height="13" rx="2" ry="2" />
+            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1" />
+          </>
+        )}
+      </svg>
+      <span>{copied ? copiedLabel : label}</span>
     </button>
   );
 }
-

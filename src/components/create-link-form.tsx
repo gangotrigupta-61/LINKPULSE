@@ -12,7 +12,11 @@ interface CreatedLinkData {
   createdAt: string;
 }
 
-export function CreateLinkForm() {
+interface CreateLinkFormProps {
+  onLinkCreated?: () => void;
+}
+
+export function CreateLinkForm({ onLinkCreated }: CreateLinkFormProps = {}) {
   const [url, setUrl] = useState("");
   const [title, setTitle] = useState("");
   const [alias, setAlias] = useState("");
@@ -41,7 +45,8 @@ export function CreateLinkForm() {
       if (alias.trim().length < 3 || alias.trim().length > 50) {
         errors.alias = "Alias must be between 3 and 50 characters.";
       } else if (!/^[a-zA-Z0-9_-]+$/.test(alias.trim())) {
-        errors.alias = "Alias can only contain letters, numbers, hyphens, and underscores.";
+        errors.alias =
+          "Alias can only contain letters, numbers, hyphens, and underscores.";
       }
     }
 
@@ -108,12 +113,19 @@ export function CreateLinkForm() {
         ...data,
         shortUrl: safeShortUrl,
       });
+
       // Reset form on success
       setUrl("");
       setTitle("");
       setAlias("");
       setExpiresAt("");
       setFieldErrors({});
+
+      // Notify dashboard & sibling link list
+      onLinkCreated?.();
+      if (typeof window !== "undefined") {
+        window.dispatchEvent(new Event("linkpulse:links-updated"));
+      }
     } catch {
       setErrorMessage("Network error occurred. Please try again.");
     } finally {
@@ -133,17 +145,17 @@ export function CreateLinkForm() {
   };
 
   return (
-    <div
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: "var(--space-4)",
-        marginTop: "var(--space-4)",
-      }}
-    >
-      <h2 style={{ fontSize: "var(--text-lg)", fontWeight: "var(--font-bold)" }}>
-        Create Short Link
-      </h2>
+    <section id="create-link-section" className="panel-card" aria-labelledby="create-link-heading">
+      <div className="panel-header">
+        <div>
+          <h2 id="create-link-heading" className="panel-title">
+            Create Short Link
+          </h2>
+          <p className="panel-subtitle">
+            Shorten any http/https destination and optionally add a custom alias or expiration.
+          </p>
+        </div>
+      </div>
 
       {errorMessage && (
         <div className="auth-alert-error" role="alert">
@@ -152,145 +164,127 @@ export function CreateLinkForm() {
       )}
 
       {createdLink && (
-        <div
-          className="auth-alert-success"
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: "var(--space-2)",
-          }}
-        >
-          <div style={{ fontWeight: "var(--font-semibold)" }}>
-            🎉 Short link created successfully!
+        <div className="created-banner" role="status">
+          <div className="created-banner-title">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.25" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <polyline points="20 6 9 17 4 12" />
+            </svg>
+            <span>Short link created</span>
           </div>
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              gap: "var(--space-2)",
-              flexWrap: "wrap",
-            }}
-          >
+
+          <div className="created-banner-row">
             <input
               type="text"
               readOnly
               value={createdLink.shortUrl}
-              className="form-input"
-              style={{
-                flex: "1 1 200px",
-                fontFamily: "var(--font-mono)",
-                fontSize: "var(--text-sm)",
-                background: "var(--color-surface)",
-              }}
+              aria-label="Generated short URL"
+              className="form-input created-banner-input"
             />
             <button
               id="copy-short-url-btn"
               type="button"
               onClick={handleCopy}
-              className="form-button"
-              style={{
-                width: "auto",
-                padding: "var(--space-2) var(--space-4)",
-                fontSize: "var(--text-sm)",
-              }}
+              className={`btn btn-sm ${copied ? "action-btn--copied" : "btn-secondary"}`}
+              style={{ height: "40px", paddingInline: "16px" }}
             >
-              {copied ? "Copied!" : "Copy URL"}
+              {copied ? "Copied" : "Copy URL"}
             </button>
           </div>
-          <div
-            style={{
-              fontSize: "var(--text-xs)",
-              color: "var(--color-text-muted)",
-              marginTop: "var(--space-1)",
-            }}
-          >
+
+          <div className="created-banner-meta">
             Destination: {createdLink.originalUrl}
             {createdLink.expiresAt && (
-              <> • Expires: {new Date(createdLink.expiresAt).toLocaleString()}</>
+              <> &middot; Expires {new Date(createdLink.expiresAt).toLocaleString()}</>
             )}
           </div>
         </div>
       )}
 
-      <form onSubmit={handleSubmit} className="auth-form" noValidate>
-        <div className="form-group">
-          <label htmlFor="destination-url" className="form-label">
-            Destination URL *
-          </label>
-          <input
-            id="destination-url"
-            type="url"
-            className={`form-input ${fieldErrors.url ? "has-error" : ""}`}
-            placeholder="https://example.com/long/url"
-            value={url}
-            onChange={(e) => setUrl(e.target.value)}
+      <form onSubmit={handleSubmit} className="create-link-form" noValidate>
+        <div className="create-link-primary-row">
+          <div className="create-link-url-wrap">
+            <label htmlFor="destination-url" className="form-label">
+              Destination URL *
+            </label>
+            <input
+              id="destination-url"
+              type="url"
+              className={`form-input create-link-url-input ${
+                fieldErrors.url ? "has-error" : ""
+              }`}
+              placeholder="https://example.com/your-long-destination-url"
+              value={url}
+              onChange={(e) => setUrl(e.target.value)}
+              disabled={loading}
+              required
+            />
+            {fieldErrors.url && (
+              <span className="form-error">{fieldErrors.url}</span>
+            )}
+          </div>
+
+          <button
+            id="create-link-submit-btn"
+            type="submit"
+            className="btn btn-primary create-link-submit-btn"
             disabled={loading}
-            required
-          />
-          {fieldErrors.url && (
-            <span className="form-error">{fieldErrors.url}</span>
-          )}
+          >
+            {loading ? "Creating..." : "Create Short Link"}
+          </button>
         </div>
 
-        <div className="form-group">
-          <label htmlFor="link-title" className="form-label">
-            Title (optional)
-          </label>
-          <input
-            id="link-title"
-            type="text"
-            className="form-input"
-            placeholder="e.g. My Portfolio Project"
-            value={title}
-            onChange={(e) => setTitle(e.target.value)}
-            disabled={loading}
-          />
-        </div>
+        <div className="create-link-options-grid">
+          <div className="form-group">
+            <label htmlFor="link-title" className="form-label">
+              Title (optional)
+            </label>
+            <input
+              id="link-title"
+              type="text"
+              className="form-input"
+              placeholder="e.g. Launch Announcement"
+              value={title}
+              onChange={(e) => setTitle(e.target.value)}
+              disabled={loading}
+            />
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="custom-alias" className="form-label">
-            Custom Alias (optional)
-          </label>
-          <input
-            id="custom-alias"
-            type="text"
-            className={`form-input ${fieldErrors.alias ? "has-error" : ""}`}
-            placeholder="e.g. my-custom-link (3-50 chars)"
-            value={alias}
-            onChange={(e) => setAlias(e.target.value)}
-            disabled={loading}
-          />
-          {fieldErrors.alias && (
-            <span className="form-error">{fieldErrors.alias}</span>
-          )}
-        </div>
+          <div className="form-group">
+            <label htmlFor="custom-alias" className="form-label">
+              Custom Alias (optional)
+            </label>
+            <input
+              id="custom-alias"
+              type="text"
+              className={`form-input ${fieldErrors.alias ? "has-error" : ""}`}
+              placeholder="e.g. summer-launch"
+              value={alias}
+              onChange={(e) => setAlias(e.target.value)}
+              disabled={loading}
+            />
+            {fieldErrors.alias && (
+              <span className="form-error">{fieldErrors.alias}</span>
+            )}
+          </div>
 
-        <div className="form-group">
-          <label htmlFor="link-expiry" className="form-label">
-            Expiration Date (optional)
-          </label>
-          <input
-            id="link-expiry"
-            type="datetime-local"
-            className={`form-input ${fieldErrors.expiresAt ? "has-error" : ""}`}
-            value={expiresAt}
-            onChange={(e) => setExpiresAt(e.target.value)}
-            disabled={loading}
-          />
-          {fieldErrors.expiresAt && (
-            <span className="form-error">{fieldErrors.expiresAt}</span>
-          )}
+          <div className="form-group">
+            <label htmlFor="link-expiry" className="form-label">
+              Expiration Date (optional)
+            </label>
+            <input
+              id="link-expiry"
+              type="datetime-local"
+              className={`form-input ${fieldErrors.expiresAt ? "has-error" : ""}`}
+              value={expiresAt}
+              onChange={(e) => setExpiresAt(e.target.value)}
+              disabled={loading}
+            />
+            {fieldErrors.expiresAt && (
+              <span className="form-error">{fieldErrors.expiresAt}</span>
+            )}
+          </div>
         </div>
-
-        <button
-          id="create-link-submit-btn"
-          type="submit"
-          className="form-button"
-          disabled={loading}
-        >
-          {loading ? "Creating Short Link..." : "Create Short Link"}
-        </button>
       </form>
-    </div>
+    </section>
   );
 }

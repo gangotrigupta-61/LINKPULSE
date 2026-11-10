@@ -47,23 +47,29 @@ function LinkStatusPage({ status }: { status: "inactive" | "expired" }) {
   const isExpired = status === "expired";
 
   return (
-    <main className="placeholder-page">
-      <div className="placeholder-card">
-        <div className="placeholder-logo">{isExpired ? "⏰" : "🚫"}</div>
-        <h1 style={{ fontSize: "var(--text-2xl)" }}>
-          {isExpired ? "Link Expired" : "Link Disabled"}
-        </h1>
-        <p className="placeholder-description">
+    <main className="status-page">
+      <div className="status-card">
+        <div className="status-icon-circle" aria-hidden="true">
+          {isExpired ? (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <polyline points="12 6 12 12 16 14" />
+            </svg>
+          ) : (
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.75" strokeLinecap="round" strokeLinejoin="round">
+              <circle cx="12" cy="12" r="10" />
+              <line x1="4.93" y1="4.93" x2="19.07" y2="19.07" />
+            </svg>
+          )}
+        </div>
+        <h1>{isExpired ? "Link Expired" : "Link Disabled"}</h1>
+        <p className="status-description">
           {isExpired
-            ? "This short link has expired and is no longer available."
+            ? "This short link has passed its expiration date and is no longer available."
             : "This short link has been disabled by its owner."}
         </p>
-        <Link
-          href="/"
-          className="auth-link"
-          style={{ marginTop: "var(--space-4)", fontSize: "var(--text-sm)" }}
-        >
-          ← Return to LinkPulse
+        <Link href="/" className="btn btn-secondary btn-sm">
+          Return to LinkPulse
         </Link>
       </div>
     </main>

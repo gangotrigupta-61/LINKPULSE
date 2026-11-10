@@ -4,6 +4,7 @@ import React, { Suspense, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { signIn } from "next-auth/react";
+import { BrandLogo } from "@/components/brand-logo";
 
 function LoginForm() {
   const router = useRouter();
@@ -92,7 +93,9 @@ function LoginForm() {
     <div className="auth-card">
       <div className="auth-header">
         <h1 className="auth-title">Welcome back</h1>
-        <p className="auth-subtitle">Log in to manage your short links</p>
+        <p className="auth-subtitle">
+          Log in to manage your short links and analytics
+        </p>
       </div>
 
       {errorMessage && (
@@ -126,44 +129,30 @@ function LoginForm() {
           <label htmlFor="login-password-input" className="form-label">
             Password
           </label>
-          <div style={{ position: "relative", display: "flex", alignItems: "center" }}>
+          <div className="password-field-wrap">
             <input
               id="login-password-input"
               type={showPassword ? "text" : "password"}
               className={`form-input ${fieldErrors.password ? "has-error" : ""}`}
-              placeholder="••••••••"
+              placeholder="Enter your password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               disabled={loading}
               autoComplete="current-password"
               required
-              style={{ paddingRight: "44px" }}
+              style={{ paddingRight: "42px" }}
             />
             <button
               type="button"
               onClick={() => setShowPassword((prev) => !prev)}
-              tabIndex={-1}
               aria-label={showPassword ? "Hide password" : "Show password"}
               title={showPassword ? "Hide password" : "Show password"}
-              style={{
-                position: "absolute",
-                right: "10px",
-                background: "transparent",
-                border: "none",
-                color: "var(--color-text-muted)",
-                cursor: "pointer",
-                padding: "6px",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                borderRadius: "var(--radius-sm)",
-                transition: "color var(--transition-fast)",
-              }}
+              className="password-toggle-btn"
             >
               {showPassword ? (
                 <svg
-                  width="20"
-                  height="20"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -177,8 +166,8 @@ function LoginForm() {
                 </svg>
               ) : (
                 <svg
-                  width="20"
-                  height="20"
+                  width="18"
+                  height="18"
                   viewBox="0 0 24 24"
                   fill="none"
                   stroke="currentColor"
@@ -221,9 +210,14 @@ function LoginForm() {
 export default function LoginPage() {
   return (
     <main className="auth-page">
-      <Suspense fallback={<div className="auth-card">Loading...</div>}>
-        <LoginForm />
-      </Suspense>
+      <div className="auth-shell">
+        <div className="auth-brand-bar">
+          <BrandLogo href="/" />
+        </div>
+        <Suspense fallback={<div className="auth-card">Loading...</div>}>
+          <LoginForm />
+        </Suspense>
+      </div>
     </main>
   );
 }
